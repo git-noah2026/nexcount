@@ -1,0 +1,19 @@
+{
+  "name": "nexcount",
+  "version": "2.0.0",
+  "description": "NEXCOUNT – Buchhaltungs- & Lagersystem by Andrerer (Cloudflare Workers + D1)",
+  "author": "Andrerer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler d1 migrations apply nexcount-db --remote && wrangler deploy",
+    "db:create": "wrangler d1 create nexcount-db",
+    "db:migrate:local": "wrangler d1 migrations apply nexcount-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply nexcount-db --remote",
+    "logs": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^4.164.0"
+  }
+}
