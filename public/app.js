@@ -110,29 +110,46 @@
   };
   const UI = { route: 'dashboard', q: {} };
 
-  // =============================================================== Server-API
-  async function api(method, url, body) {
+  // =============================================================== Supabase
+  const CFG = window.NEXCOUNT_CONFIG || {};
+  const configured = !!(CFG.supabaseUrl && CFG.supabaseKey && !/DEIN-PROJEKT|DEIN-SCHLUESSEL/.test(CFG.supabaseUrl + CFG.supabaseKey));
+  const sb = configured && window.supabase
+    ? window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'nexcount-auth' },
+    })
+    : null;
+
+  const offlineError = () => Object.assign(new Error('Keine Verbindung zum Server.'), { offline: true });
+  const isNetworkMsg = (m) => /failed to fetch|networkerror|network request failed|load failed|fetch failed/i.test(String(m || ''));
+
+  // Datenbankfunktion aufrufen (supabase/schema.sql)
+  async function rpc(fn, args = {}) {
+    if (!navigator.onLine) throw offlineError();
     let res;
-    try {
-      res = await fetch(url, {
-        method,
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Nexcount': '1' },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-    } catch {
-      const err = new Error('Keine Verbindung zum Server.');
-      err.offline = true;
+    try { res = await sb.rpc(fn, args); } catch { throw offlineError(); }
+    if (res.error) {
+      const msg = res.error.message || 'Unbekannter Fehler';
+      if (isNetworkMsg(msg) || res.status === 0) throw offlineError();
+      const err = new Error(msg === 'NO_COMPANY' ? 'Du gehörst keiner Firma mehr an.' : msg);
+      if (msg === 'NO_COMPANY') err.noCompany = true;
+      if (res.status === 401 || res.error.code === '28000' || /jwt|token/i.test(msg)) err.status = 401;
       throw err;
     }
-    let data = null;
-    try { data = await res.json(); } catch { /* leer */ }
-    if (!res.ok) {
-      const err = new Error((data && data.error) || `Fehler ${res.status}`);
-      err.status = res.status;
-      throw err;
-    }
-    return data;
+    return res.data;
+  }
+
+  // Fehlermeldungen von Supabase Auth auf Deutsch
+  function authMessage(error) {
+    const m = String((error && error.message) || error || '');
+    if (isNetworkMsg(m)) return 'Keine Verbindung zum Server.';
+    if (/invalid login credentials/i.test(m)) return 'E-Mail oder Passwort ist falsch.';
+    if (/email not confirmed/i.test(m)) return 'Bitte bestätige zuerst deine E-Mail-Adresse (Link in der Bestätigungsmail).';
+    if (/already registered|already been registered/i.test(m)) return 'Diese E-Mail-Adresse ist bereits registriert.';
+    if (/password should be at least|weak password/i.test(m)) return 'Das Passwort ist zu schwach (mindestens 8 Zeichen, besser länger).';
+    if (/rate limit|too many|security purposes/i.test(m)) return 'Zu viele Versuche. Bitte warte einen Moment und versuche es erneut.';
+    if (/invalid email|unable to validate email/i.test(m)) return 'Ungültige E-Mail-Adresse.';
+    if (/same password|different from the old/i.test(m)) return 'Das neue Passwort muss sich vom alten unterscheiden.';
+    return m || 'Unbekannter Fehler';
   }
 
   // =============================================================== Lokaler Speicher (Offline-Cache)
@@ -218,7 +235,8 @@
   const isLow = (a, st) => num(a.min) > 0 && (st[a.id] || 0) <= num(a.min);
 
   // =============================================================== Synchronisierung
-  const SYNC_BATCH = 40; // passend zu MAX_OPS im Worker (D1-Limit im Free-Plan)
+  const SYNC_BATCH = 200; // Änderungen pro Anfrage (Datenbank erlaubt bis 500)
+  const SYNC_BYTES = 900 * 1024; // und höchstens ~0,9 MB pro Anfrage
   let syncTimer = null;
   function scheduleSync(delay = 400) {
     clearTimeout(syncTimer);
@@ -232,8 +250,15 @@
     renderStatus();
     let changedView = false;
     try {
-      const ops = S.pending.slice(0, SYNC_BATCH);
-      const res = await api('POST', '/api/sync', { since: S.seq, ops });
+      const ops = [];
+      let bytes = 0;
+      for (const o of S.pending) {
+        const size = JSON.stringify(o).length;
+        if (ops.length && (ops.length >= SYNC_BATCH || bytes + size > SYNC_BYTES)) break;
+        ops.push(o);
+        bytes += size;
+      }
+      const res = await rpc('sync', { p_ops: ops, p_since: S.seq });
       const sent = new Map(ops.map((o) => [`${o.collection}:${o.id}`, o.updatedAt]));
       S.pending = S.pending.filter((o) => sent.get(`${o.collection}:${o.id}`) !== o.updatedAt);
       const stillPending = new Set(S.pending.map((o) => `${o.collection}:${o.id}`));
@@ -258,6 +283,10 @@
         sessionExpired();
         return;
       }
+      if (e.noCompany) {
+        lostCompany();
+        return;
+      }
       if (e.offline) S.online = false;
       else S.syncError = e.message;
     } finally {
@@ -271,49 +300,32 @@
     if (changedView) render({ fromSync: true });
   }
 
-  // Live-Verbindung (WebSocket zum Durable Object der Firma)
-  let ws = null;
-  let wsRetry = null;
-  let wsPing = null;
-  let wsBackoff = 1000;
+  // Live-Verbindung: Supabase Realtime meldet jede neue Revision der Firma (companies.seq)
+  let channel = null;
   function connectEvents() {
     disconnectEvents();
-    if (!window.WebSocket || !S.user) return;
-    const sock = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/live`);
-    ws = sock;
-    sock.onopen = () => {
-      wsBackoff = 1000;
-      S.online = true;
-      renderStatus();
-      wsPing = setInterval(() => { try { sock.send('ping'); } catch { /* egal */ } }, 30000);
-    };
-    sock.onmessage = (e) => {
-      if (e.data === 'pong') return;
-      let msg;
-      try { msg = JSON.parse(e.data); } catch { return; }
-      if (msg.type === 'kicked') { disconnectEvents(); sync(); return; } // Zugang entzogen → Sync erkennt 401
-      if (msg.type === 'change' && (msg.seq !== S.seq || S.pending.length)) sync();
-    };
-    sock.onclose = () => {
-      clearInterval(wsPing);
-      if (ws !== sock) return; // bewusst geschlossen
-      ws = null;
-      if (!S.user) return;
-      if (!navigator.onLine) S.online = false;
-      renderStatus();
-      wsRetry = setTimeout(connectEvents, wsBackoff);
-      wsBackoff = Math.min(wsBackoff * 2, 30000);
-      sync(); // erkennt abgelaufene Sitzung oder Offline-Zustand
-    };
+    if (!sb || !S.user || !S.company) return;
+    const cid = S.company.id;
+    channel = sb.channel(`nexcount-${cid}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'companies', filter: `id=eq.${cid}` }, (payload) => {
+        const row = payload.new || {};
+        if (row.name && S.company && row.name !== S.company.name) { S.company.name = row.name; render({ fromSync: true }); }
+        if (Number(row.seq) !== S.seq || S.pending.length) sync();
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          S.online = true;
+          renderStatus();
+          sync(); // Verpasstes nachholen
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          if (!navigator.onLine) S.online = false;
+          renderStatus();
+        }
+      });
   }
   function disconnectEvents() {
-    clearTimeout(wsRetry);
-    clearInterval(wsPing);
-    if (ws) {
-      const s = ws;
-      ws = null;
-      try { s.close(); } catch { /* egal */ }
-    }
+    if (channel && sb) sb.removeChannel(channel);
+    channel = null;
   }
 
   window.addEventListener('online', () => { S.online = true; renderStatus(); sync(); });
@@ -330,18 +342,39 @@
     safeLS.set('nexcount:last', { user: me.user, company: me.company });
     if (userChanged) loadLocal();
     render();
-    if (!offline) {
-      connectEvents();
-      sync();
-    } else {
+    if (offline) {
       S.online = false;
       renderStatus();
-      connectEvents();
+    } else {
+      sync();
+    }
+    connectEvents();
+  }
+
+  // Profil/Firma laden und je nach Zustand App, Firmen-Einrichtung oder Anmeldung zeigen
+  async function loadMe() {
+    try {
+      const me = await rpc('me');
+      if (!me.company) return autoOnboard(me);
+      setSession(me);
+    } catch (e) {
+      const last = safeLS.get('nexcount:last');
+      if (e.offline && last && last.user && last.company) {
+        setSession({ ...last, members: [] }, true);
+        toast('Offline-Modus: Änderungen werden synchronisiert, sobald eine Verbindung besteht.');
+      } else if (e.status === 401) {
+        await signOutQuietly();
+        renderAuth('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
+      } else {
+        renderAuth(e.message);
+      }
     }
   }
+
   async function refreshMe() {
     try {
-      const me = await api('GET', '/api/me');
+      const me = await rpc('me');
+      if (!me.company) return lostCompany();
       S.user = me.user;
       S.company = me.company;
       S.members = me.members || [];
@@ -351,6 +384,41 @@
       if (e.status === 401) sessionExpired();
     }
   }
+
+  // Nach der Registrierung: gewählte Firma automatisch anlegen bzw. beitreten
+  async function autoOnboard(me) {
+    let meta = {};
+    try { meta = ((await sb.auth.getUser()).data.user || {}).user_metadata || {}; } catch { /* egal */ }
+    const name = meta.name || (me.user && me.user.name) || '';
+    if (meta.companyName || meta.inviteCode) {
+      try {
+        const res = meta.inviteCode
+          ? await rpc('join_company', { p_code: meta.inviteCode, p_name: name })
+          : await rpc('create_company', { p_company_name: meta.companyName, p_name: name });
+        await sb.auth.updateUser({ data: { companyName: null, inviteCode: null } }).catch(() => {});
+        setSession(res);
+        toast(`Willkommen bei NEXCOUNT, ${res.user.name}!`, 'ok');
+        return;
+      } catch (e) {
+        await sb.auth.updateUser({ data: { companyName: null, inviteCode: null } }).catch(() => {});
+        return renderOnboarding(me, e.message);
+      }
+    }
+    renderOnboarding(me, '');
+  }
+
+  // Zugang zur Firma wurde entzogen (z. B. vom Admin entfernt)
+  function lostCompany() {
+    disconnectEvents();
+    if (S.user) safeLS.del(lsKey());
+    safeLS.del('nexcount:last');
+    const me = { user: { ...(S.user || {}) } };
+    Object.assign(S, { company: null, members: [], db: {}, seq: 0, pending: [], lastSync: 0, user: null });
+    S.ver++;
+    closeModal();
+    renderOnboarding(me, 'Du gehörst keiner Firma (mehr) an. Lege eine neue Firma an oder tritt mit einem Einladungscode bei.');
+  }
+
   function sessionExpired() {
     disconnectEvents();
     S.user = null;
@@ -359,14 +427,18 @@
     closeModal();
     renderAuth('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an – ungesendete Änderungen bleiben erhalten.');
   }
+  async function signOutQuietly() {
+    try { await sb.auth.signOut({ scope: 'local' }); } catch { /* offline egal */ }
+  }
   async function logout() {
     if (S.pending.length && !confirm(`${S.pending.length} Änderung(en) wurden noch nicht synchronisiert und gehen beim Abmelden verloren. Trotzdem abmelden?`)) return;
-    try { await api('POST', '/api/auth/logout'); } catch { /* offline egal */ }
     disconnectEvents();
     if (S.user) safeLS.del(lsKey());
     safeLS.del('nexcount:last');
     Object.assign(S, { user: null, company: null, members: [], db: {}, seq: 0, pending: [], lastSync: 0 });
     S.ver++;
+    await signOutQuietly();
+    authTab = 'login';
     renderAuth('');
   }
 
@@ -691,30 +763,65 @@
   }
 
   // =============================================================== Anmeldung
-  let authTab = 'login';
+  let authTab = 'login'; // login | register | forgot
   let authMode = 'new';
   let authMsg = '';
-  function renderAuth(msg) {
-    if (msg !== undefined) authMsg = msg;
+  let authMsgType = 'error';
+  let authEmail = '';
+  const companyFields = () => `<div class="seg full"><button type="button" data-action="auth-mode" data-mode="new" class="${authMode === 'new' ? 'active' : ''}">Neue Firma</button><button type="button" data-action="auth-mode" data-mode="join" class="${authMode === 'join' ? 'active' : ''}">Einladungscode</button></div>
+    ${authMode === 'new' ? field('Firmenname', '<input name="companyName" required maxlength="120" autocomplete="organization">') : field('Einladungscode', '<input name="inviteCode" required maxlength="20" style="text-transform:uppercase;letter-spacing:.12em" placeholder="z. B. 8F3A21C09B">')}`;
+
+  function renderAuth(msg, type) {
+    if (msg !== undefined) { authMsg = msg; authMsgType = type || (/^Deine Sitzung/.test(msg) ? 'info' : 'error'); }
     const reg = authTab === 'register';
+    const forgot = authTab === 'forgot';
+    authShell(`
+        <div class="stack" style="gap:6px">
+          <h1>${forgot ? 'Passwort zurücksetzen' : reg ? 'Konto erstellen' : 'Willkommen zurück'}</h1>
+          <p class="muted">${forgot ? 'Wir schicken dir einen Link, mit dem du ein neues Passwort festlegen kannst.' : reg ? 'Lege eine neue Firma an oder tritt deinem Team mit einem Einladungscode bei.' : 'Melde dich an, um Buchhaltung und Lager zu verwalten.'}</p>
+        </div>
+        ${forgot ? '' : `<div class="seg full"><button type="button" data-action="auth-tab" data-tab="login" class="${reg ? '' : 'active'}">Anmelden</button><button type="button" data-action="auth-tab" data-tab="register" class="${reg ? 'active' : ''}">Registrieren</button></div>`}
+        <div id="auth-msg" class="alert ${authMsgType === 'info' ? 'info' : ''} ${authMsg ? '' : 'hidden'}">${esc(authMsg)}</div>
+        <form data-form="auth" class="stack">
+          ${reg ? field('Dein Name', '<input name="name" required maxlength="80" autocomplete="name">') : ''}
+          ${field('E-Mail', `<input name="email" type="email" required maxlength="120" autocomplete="email" value="${esc(authEmail)}">`)}
+          ${forgot ? '' : field('Passwort', `<input name="password" type="password" required ${reg ? 'minlength="8"' : ''} autocomplete="${reg ? 'new-password' : 'current-password'}">`)}
+          ${reg ? companyFields() : ''}
+          <button class="btn primary block" type="submit">${forgot ? 'Link senden' : reg ? 'Konto erstellen' : 'Anmelden'}</button>
+        </form>
+        <p class="muted small">${forgot ? '<a href="#" data-action="auth-tab" data-tab="login">Zurück zur Anmeldung</a>'
+          : reg ? 'Mindestens 8 Zeichen. Nach der Registrierung bekommst du eine E-Mail zur Bestätigung.'
+            : '<a href="#" data-action="auth-tab" data-tab="forgot">Passwort vergessen?</a>'}</p>`);
+  }
+
+  // Angemeldet, aber noch keiner Firma zugeordnet
+  function renderOnboarding(me, msg) {
+    authTab = 'onboard';
+    authShell(`
+        <div class="stack" style="gap:6px">
+          <h1>Firma einrichten</h1>
+          <p class="muted">Angemeldet als <b>${esc((me.user && me.user.email) || '')}</b>. Lege deine Firma an oder tritt einem bestehenden Team bei.</p>
+        </div>
+        <div id="auth-msg" class="alert ${msg ? '' : 'hidden'}">${esc(msg || '')}</div>
+        <form data-form="onboard" class="stack">
+          ${field('Dein Name', `<input name="name" required maxlength="80" value="${esc((me.user && me.user.name) || '')}">`)}
+          ${companyFields()}
+          <button class="btn primary block" type="submit">Weiter</button>
+        </form>
+        <p class="muted small"><a href="#" data-action="logout">Abmelden</a></p>`);
+  }
+
+  function renderSetupMissing() {
+    authShell(`<h1>Einrichtung fehlt</h1>
+      <div class="alert">Die Verbindung zu Supabase ist noch nicht konfiguriert.</div>
+      <p class="muted">Trage in <code>public/config.js</code> die Project URL und den Publishable Key deines Supabase-Projekts ein (Supabase → Project Settings → API).</p>`);
+  }
+
+  function authShell(inner) {
     $('#app').innerHTML = `<div class="auth">
       <div class="auth-panel">
         <div class="brand big"><img src="/icon.svg" alt=""><div><div class="brand-name">NEXCOUNT</div><div class="brand-sub">by Andrerer</div></div></div>
-        <div class="stack" style="gap:6px">
-          <h1>${reg ? 'Konto erstellen' : 'Willkommen zurück'}</h1>
-          <p class="muted">${reg ? 'Lege eine neue Firma an oder tritt deinem Team mit einem Einladungscode bei.' : 'Melde dich an, um Buchhaltung und Lager zu verwalten.'}</p>
-        </div>
-        <div class="seg full"><button type="button" data-action="auth-tab" data-tab="login" class="${reg ? '' : 'active'}">Anmelden</button><button type="button" data-action="auth-tab" data-tab="register" class="${reg ? 'active' : ''}">Registrieren</button></div>
-        <div id="auth-msg" class="alert ${authMsg.startsWith('Deine Sitzung') ? 'info' : ''} ${authMsg ? '' : 'hidden'}">${esc(authMsg)}</div>
-        <form data-form="auth" class="stack">
-          ${reg ? field('Dein Name', '<input name="name" required maxlength="80" autocomplete="name">') : ''}
-          ${field('E-Mail', '<input name="email" type="email" required maxlength="120" autocomplete="email">')}
-          ${field('Passwort', `<input name="password" type="password" required ${reg ? 'minlength="8"' : ''} autocomplete="${reg ? 'new-password' : 'current-password'}">`)}
-          ${reg ? `<div class="seg full"><button type="button" data-action="auth-mode" data-mode="new" class="${authMode === 'new' ? 'active' : ''}">Neue Firma</button><button type="button" data-action="auth-mode" data-mode="join" class="${authMode === 'join' ? 'active' : ''}">Einladungscode</button></div>
-            ${authMode === 'new' ? field('Firmenname', '<input name="companyName" required maxlength="120" autocomplete="organization">') : field('Einladungscode', '<input name="inviteCode" required maxlength="20" style="text-transform:uppercase;letter-spacing:.12em" placeholder="z. B. 8F3A21C09B">')}` : ''}
-          <button class="btn primary block" type="submit">${reg ? 'Konto erstellen' : 'Anmelden'}</button>
-        </form>
-        <p class="muted small">${reg ? 'Mindestens 8 Zeichen. Passwörter werden mit scrypt gehasht gespeichert.' : 'Noch kein Konto? Wechsle oben zu „Registrieren“.'}</p>
+        ${inner}
       </div>
       <div class="auth-hero">
         <h2>Buchhaltung und Lager in einem – live synchronisiert.</h2>
@@ -727,8 +834,29 @@
         </ul>
       </div>
     </div>`;
-    const first = $('form[data-form=auth] input');
+    const first = $('.auth-panel form input:not([value]), .auth-panel form input[value=""]') || $('.auth-panel form input');
     if (first) first.focus();
+  }
+
+  // Link aus „Passwort vergessen“-Mail geöffnet → neues Passwort setzen
+  function openNewPassword() {
+    openModal({
+      title: 'Neues Passwort festlegen',
+      body: `<p class="muted">Lege ein neues Passwort für dein NEXCOUNT-Konto fest.</p>
+        ${field('Neues Passwort', '<input name="password" type="password" required minlength="8" autocomplete="new-password">')}
+        ${field('Wiederholen', '<input name="password2" type="password" required minlength="8" autocomplete="new-password">')}`,
+      submit: 'Passwort speichern',
+      onSubmit(fd) {
+        if (fd.password !== fd.password2) throw new Error('Die Passwörter stimmen nicht überein.');
+        sb.auth.updateUser({ password: fd.password }).then(({ error }) => {
+          if (error) return toast(authMessage(error), 'error');
+          closeModal();
+          toast('Passwort geändert', 'ok');
+          if (!S.user) loadMe();
+        });
+        return false;
+      },
+    });
   }
 
   // =============================================================== Ansicht: Übersicht
@@ -1662,8 +1790,8 @@
               <div><button class="btn sm" type="submit">Name speichern</button></div>
             </form>
             <form data-form="password" class="grid2">
-              ${field('Aktuelles Passwort', '<input name="oldPassword" type="password" required autocomplete="current-password">')}
               ${field('Neues Passwort', '<input name="newPassword" type="password" required minlength="8" autocomplete="new-password">')}
+              ${field('Neues Passwort wiederholen', '<input name="newPassword2" type="password" required minlength="8" autocomplete="new-password">')}
               <div><button class="btn sm" type="submit">Passwort ändern</button></div>
             </form>
           </section>
@@ -1743,17 +1871,53 @@
     async auth(fd, f) {
       const btn = $('[type=submit]', f);
       btn.disabled = true;
-      const msg = $('#auth-msg');
+      const showMsg = (text, type = 'error') => {
+        const el = $('#auth-msg');
+        el.textContent = text;
+        el.className = `alert ${type === 'info' ? 'info' : ''}`;
+        btn.disabled = false;
+      };
+      const email = String(fd.email || '').trim().toLowerCase();
+      authEmail = email;
       try {
-        const body = { ...fd };
-        if (body.inviteCode) body.inviteCode = body.inviteCode.trim().toUpperCase();
-        const me = await api('POST', authTab === 'register' ? '/api/auth/register' : '/api/auth/login', body);
+        if (authTab === 'forgot') {
+          const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/` });
+          if (error) throw error;
+          return showMsg('Falls ein Konto mit dieser Adresse existiert, ist eine E-Mail mit einem Link unterwegs.', 'info');
+        }
+        if (authTab === 'register') {
+          const meta = { name: String(fd.name || '').trim() };
+          if (authMode === 'join') meta.inviteCode = String(fd.inviteCode || '').trim().toUpperCase();
+          else meta.companyName = String(fd.companyName || '').trim();
+          const { data, error } = await sb.auth.signUp({ email, password: fd.password, options: { data: meta, emailRedirectTo: `${location.origin}/` } });
+          if (error) throw error;
+          if (!data.session) {
+            authTab = 'login';
+            return renderAuth(`Fast geschafft! Wir haben dir eine E-Mail an ${email} geschickt. Bitte bestätige deine Adresse über den Link – danach geht es automatisch weiter.`, 'info');
+          }
+        } else {
+          const { error } = await sb.auth.signInWithPassword({ email, password: fd.password });
+          if (error) throw error;
+        }
         authMsg = '';
-        setSession(me);
-        if (authTab === 'register') toast(`Willkommen bei NEXCOUNT, ${me.user.name}!`, 'ok');
+        await loadMe();
       } catch (e) {
-        msg.textContent = e.message;
-        msg.className = 'alert';
+        showMsg(authMessage(e));
+      }
+    },
+    async onboard(fd, f) {
+      const btn = $('[type=submit]', f);
+      btn.disabled = true;
+      try {
+        const res = authMode === 'join'
+          ? await rpc('join_company', { p_code: String(fd.inviteCode || '').trim().toUpperCase(), p_name: fd.name })
+          : await rpc('create_company', { p_company_name: fd.companyName, p_name: fd.name });
+        setSession(res);
+        toast(`Willkommen bei NEXCOUNT, ${res.user.name}!`, 'ok');
+      } catch (e) {
+        const el = $('#auth-msg');
+        el.textContent = e.message;
+        el.className = 'alert';
         btn.disabled = false;
       }
     },
@@ -1764,22 +1928,24 @@
       data.smallBusiness = fd.smallBusiness === 'on';
       put('settings', data);
       if (S.user.role === 'admin' && data.name && data.name !== S.company.name) {
-        api('POST', '/api/company', { name: data.name }).then((me) => { S.company = me.company; render(); }).catch(() => {});
+        rpc('update_company', { p_name: data.name }).then((me) => { S.company = me.company; render(); }).catch(() => {});
       }
       toast('Firmendaten gespeichert', 'ok');
       render();
     },
     async profile(fd) {
-      const me = await api('POST', '/api/account/profile', { name: fd.name });
+      const me = await rpc('update_profile', { p_name: fd.name });
       S.user = me.user;
       safeLS.set('nexcount:last', { user: me.user, company: me.company });
       toast('Name gespeichert', 'ok');
       refreshMe();
     },
     async password(fd, f) {
-      await api('POST', '/api/account/password', fd);
+      if (fd.newPassword !== fd.newPassword2) throw new Error('Die Passwörter stimmen nicht überein.');
+      const { error } = await sb.auth.updateUser({ password: fd.newPassword });
+      if (error) throw new Error(authMessage(error));
       f.reset();
-      toast('Passwort geändert – andere Sitzungen wurden abgemeldet.', 'ok');
+      toast('Passwort geändert', 'ok');
     },
   };
 
@@ -1788,8 +1954,20 @@
     'toggle-menu': () => $('#shell').classList.toggle('menu-open'),
     'sync-now': () => { if (!S.online) toast('Keine Verbindung – Änderungen werden später übertragen.'); sync(); },
     logout,
-    'auth-tab': (el) => { authTab = el.dataset.tab; authMsg = ''; renderAuth(); },
-    'auth-mode': (el) => { authMode = el.dataset.mode; renderAuth(); },
+    'auth-tab': (el) => {
+      const email = $('.auth-panel input[name=email]');
+      if (email && email.value) authEmail = email.value;
+      authTab = el.dataset.tab;
+      renderAuth('');
+    },
+    'auth-mode': (el) => {
+      authMode = el.dataset.mode;
+      if (authTab !== 'onboard') return renderAuth();
+      // Firmen-Einrichtung: nur den Firmenteil austauschen, Name behalten
+      const form = $('form[data-form=onboard]');
+      const name = $('input[name=name]', form).value;
+      form.innerHTML = `${field('Dein Name', `<input name="name" required maxlength="80" value="${esc(name)}">`)}${companyFields()}<button class="btn primary block" type="submit">Weiter</button>`;
+    },
     'set-ui': (el) => {
       UI.q[el.dataset.k] = el.dataset.v;
       if (el.tagName === 'A' && el.getAttribute('href')) {
@@ -1839,15 +2017,15 @@
     },
     'invite-rotate': async () => {
       if (!confirm('Neuen Einladungscode erzeugen? Der alte Code wird ungültig.')) return;
-      try { const me = await api('POST', '/api/company/invite'); S.company = me.company; S.members = me.members; render(); toast('Neuer Code erstellt', 'ok'); } catch (e) { toast(e.message, 'error'); }
+      try { const me = await rpc('rotate_invite'); S.company = me.company; S.members = me.members; render(); toast('Neuer Code erstellt', 'ok'); } catch (e) { toast(e.message, 'error'); }
     },
     'member-remove': async (el) => {
       const m = S.members.find((x) => x.id === el.dataset.id);
-      if (!m || !confirm(`${m.name} (${m.email}) aus dem Team entfernen? Das Konto wird gelöscht und sofort abgemeldet.`)) return;
-      try { const me = await api('DELETE', `/api/company/members/${m.id}`); S.members = me.members; render(); toast('Benutzer entfernt', 'ok'); } catch (e) { toast(e.message, 'error'); }
+      if (!m || !confirm(`${m.name} (${m.email}) aus dem Team entfernen? Der Zugriff auf alle Firmendaten endet sofort. Tipp: Erzeuge danach einen neuen Einladungscode.`)) return;
+      try { const me = await rpc('remove_member', { p_user: m.id }); S.members = me.members; render(); toast('Benutzer entfernt', 'ok'); } catch (e) { toast(e.message, 'error'); }
     },
     'member-role': async (el) => {
-      try { const me = await api('PATCH', `/api/company/members/${el.dataset.id}`, { role: el.dataset.role }); S.members = me.members; render(); toast('Rolle geändert', 'ok'); } catch (e) { toast(e.message, 'error'); }
+      try { const me = await rpc('set_member_role', { p_user: el.dataset.id, p_role: el.dataset.role }); S.members = me.members; render(); toast('Rolle geändert', 'ok'); } catch (e) { toast(e.message, 'error'); }
     },
   };
 
@@ -1886,17 +2064,31 @@
     const r = (location.hash.match(/^#\/(\w+)/) || [])[1];
     UI.route = VIEWS[r] ? r : 'dashboard';
     if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(() => {});
-    try {
-      setSession(await api('GET', '/api/me'));
-    } catch (e) {
-      const last = safeLS.get('nexcount:last');
-      if (e.offline && last && last.user) {
-        setSession({ ...last, members: [] }, true);
-        toast('Offline-Modus: Änderungen werden synchronisiert, sobald der Server erreichbar ist.');
-      } else {
-        renderAuth(e.offline ? 'Server nicht erreichbar. Bitte Verbindung prüfen.' : '');
-      }
+    if (!sb) return renderSetupMissing();
+
+    // Fehler aus E-Mail-Links (z. B. abgelaufener Bestätigungslink)
+    const hashParams = new URLSearchParams(location.hash.replace(/^#\/?/, ''));
+    const linkError = hashParams.get('error_description');
+    if (linkError) history.replaceState(null, '', location.pathname);
+
+    sb.auth.onAuthStateChange((event) => {
+      // keine Supabase-Aufrufe direkt im Callback (Deadlock-Gefahr) → setTimeout
+      if (event === 'PASSWORD_RECOVERY') setTimeout(openNewPassword, 0);
+      if (event === 'SIGNED_OUT' && S.user) setTimeout(sessionExpired, 0);
+    });
+
+    const last = safeLS.get('nexcount:last');
+    if (!navigator.onLine && last && last.user && last.company) {
+      setSession({ ...last, members: [] }, true);
+      toast('Offline-Modus: Änderungen werden synchronisiert, sobald eine Verbindung besteht.');
+      return;
     }
+    let session = null;
+    try { session = (await sb.auth.getSession()).data.session; } catch { /* egal */ }
+    if (!session) {
+      return renderAuth(linkError ? `Der Link ist ungültig oder abgelaufen (${linkError}). Bitte erneut anfordern.` : '');
+    }
+    await loadMe();
   }
   boot();
 })();

@@ -1,38 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  // Cloudflare liefert nur die Oberfläche aus (statische Dateien in public/).
+  // Anmeldung, Datenbank und Live-Sync laufen über Supabase.
   "name": "nexcount",
-  "main": "src/worker.js",
   "compatibility_date": "2025-09-01",
-
-  // Frontend (HTML/CSS/JS) als statische Assets; alles unter /api/ geht an den Worker
   "assets": {
-    "directory": "./public",
-    "binding": "ASSETS"
-  },
-
-  // Cloudflare D1 – SQL-Datenbank für Benutzer, Firmen, Sitzungen und alle Geschäftsdaten
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "nexcount-db",
-      "database_id": "00000000-0000-0000-0000-000000000000", // ← nach `npx wrangler d1 create nexcount-db` ersetzen
-      "migrations_dir": "migrations"
-    }
-  ],
-
-  // Durable Object pro Firma für Live-Updates per WebSocket
-  "durable_objects": {
-    "bindings": [{ "name": "SYNC_HUB", "class_name": "SyncHub" }]
-  },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SyncHub"] }],
-
-  "vars": {
-    // Änderungen pro Sync-Anfrage. Free-Plan: max. 40 (D1-Limit 50 Abfragen/Anfrage). Paid-Plan: bis 500.
-    "MAX_OPS": "40"
-  },
-
-  // täglich abgelaufene Sitzungen aufräumen
-  "triggers": { "crons": ["17 3 * * *"] },
-
-  "observability": { "enabled": true }
+    "directory": "./public"
+  }
 }
