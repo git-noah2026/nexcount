@@ -6,6 +6,6 @@
  * NIEMALS den secret/service_role Key hier eintragen!
  */
 window.NEXCOUNT_CONFIG = {
-  supabaseUrl: 'https://DEIN-PROJEKT.supabase.co',
-  supabaseKey: 'DEIN-SCHLUESSEL',
+  supabaseUrl: 'https://xrzovtfaqthaxucaoale.supabase.co',
+  supabaseKey: 'sb_publishable_BGnPI68bnGu_UoBjtj2bFQ_7pD2CuNz',
 };
