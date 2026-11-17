@@ -1,5 +1,5 @@
 /* NEXCOUNT Service Worker – App-Shell offline verfügbar machen (Network-first) */
-const CACHE = 'nexcount-v2';
+const CACHE = 'nexcount-v3';
 const ASSETS = ['/', '/index.html', '/app.css', '/app.js', '/config.js', '/vendor/supabase.js', '/icon.svg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {

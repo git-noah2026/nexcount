@@ -64,7 +64,32 @@
     initial: 'Anfangsbestand', in: 'Wareneingang', out: 'Warenausgang', correction: 'Inventurkorrektur',
     sale: 'Verkauf', purchase: 'Einkauf', storno: 'Storno',
   };
-  const DOC_STATUS = { draft: 'Entwurf', open: 'Offen', paid: 'Bezahlt', cancelled: 'Storniert' };
+  const DOC_STATUS = { draft: 'Entwurf', open: 'Offen', paid: 'Bezahlt', cancelled: 'Storniert', accepted: 'Angenommen', rejected: 'Abgelehnt' };
+  const statusLabel = (d) => (d.kind === 'quote' && d.status === 'open' ? 'Versendet' : DOC_STATUS[d.status] || d.status);
+  const DOC_KINDS = {
+    sale: { label: 'Rechnung', plural: 'Rechnungen', prefixKey: 'invoicePrefix', prefix: 'RE', module: 'invoices', contact: 'customer', icon: 'file' },
+    quote: { label: 'Angebot', plural: 'Angebote', prefixKey: 'quotePrefix', prefix: 'AN', module: 'quotes', contact: 'customer', icon: 'send' },
+    purchase: { label: 'Einkauf', plural: 'Einkäufe', prefixKey: 'purchasePrefix', prefix: 'EK', module: 'purchases', contact: 'supplier', icon: 'cart' },
+  };
+  // Funktionen, die jede Firma nach Bedarf ein- und ausschalten kann (Kassenbuch ist immer aktiv)
+  const MODULES = {
+    invoices: { label: 'Rechnungen', icon: 'file', desc: 'Rechnungen schreiben, als PDF drucken, Zahlungseingänge automatisch ins Kassenbuch buchen.', requires: ['contacts'] },
+    quotes: { label: 'Angebote', icon: 'send', desc: 'Angebote erstellen und mit einem Klick in eine Rechnung umwandeln.', requires: ['invoices'] },
+    purchases: { label: 'Einkäufe', icon: 'cart', desc: 'Eingangsrechnungen von Lieferanten erfassen – mit Lagerbuchung, wenn das Lager aktiv ist.', requires: ['contacts'] },
+    contacts: { label: 'Kunden & Lieferanten', icon: 'users', desc: 'Adressbuch mit Umsatzübersicht je Kontakt.' },
+    catalog: { label: 'Produkte & Leistungen', icon: 'tag', desc: 'Deine Preisliste – Positionen mit einem Klick in Rechnungen und Angebote übernehmen.' },
+    inventory: { label: 'Lagerverwaltung', icon: 'layers', desc: 'Bestände, Wareneingang und -ausgang, Inventur und Warnung bei Mindestbestand.', requires: ['catalog'] },
+    reports: { label: 'Berichte & Export', icon: 'chart', desc: 'Gewinnermittlung (EÜR), Umsatzsteuer-Übersicht, CSV- und Backup-Export.' },
+  };
+  const ALL_MODULES = Object.keys(MODULES);
+  const PRESETS = {
+    service: { label: 'Dienstleister & Freiberufler', icon: 'briefcase', desc: 'Rechnungen, Angebote, Kunden und Leistungskatalog – ohne Lager.', modules: ['invoices', 'quotes', 'contacts', 'catalog', 'reports'] },
+    shop: { label: 'Handel & Laden', icon: 'cart', desc: 'Warenwirtschaft mit Lager, Einkauf und Verkauf.', modules: ['invoices', 'purchases', 'contacts', 'catalog', 'inventory', 'reports'] },
+    craft: { label: 'Handwerk & Werkstatt', icon: 'tool', desc: 'Angebote, Rechnungen, Material im Lager und Einkauf.', modules: ALL_MODULES },
+    simple: { label: 'Nur Kassenbuch', icon: 'book', desc: 'Einnahmen und Ausgaben erfassen – mehr nicht.', modules: ['reports'] },
+    all: { label: 'Alles', icon: 'dashboard', desc: 'Alle Funktionen einschalten.', modules: ALL_MODULES },
+  };
+  const ART_TYPES = { product: 'Produkt (Ware)', service: 'Leistung (Dienstleistung)' };
   const KINDS = { income: 'Einnahme', expense: 'Ausgabe' };
   const CONTACT_TYPES = { customer: 'Kunde', supplier: 'Lieferant', both: 'Kunde & Lieferant' };
   const METHODS = ['Bank', 'Kasse', 'Karte', 'PayPal', 'Sonstige'];
@@ -99,6 +124,19 @@
     cloud: '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>',
     shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
     zap: '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>',
+    send: '<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/>',
+    cart: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/>',
+    tag: '<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/><circle cx="7" cy="7" r="1.5"/>',
+    briefcase: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+    tool: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+    bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+    more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+    arrowRight: '<path d="M5 12h14M12 5l7 7-7 7"/>',
+    sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
+    wallet: '<path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>',
+    trendUp: '<path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/>',
+    trendDown: '<path d="M23 18l-9.5-9.5-5 5L1 6"/><path d="M17 18h6v-6"/>',
+    sparkle: '<path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/>',
   };
   const icon = (n, s = 18) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n] || ''}</svg>`;
 
@@ -223,6 +261,30 @@
     return r;
   }
   const settings = () => get('settings', 'company') || {};
+  // Module: ohne gespeicherte Auswahl ist alles aktiv (bestehende Firmen bleiben unverändert)
+  const modulesOn = () => { const m = settings().modules; return m && typeof m === 'object' ? m : null; };
+  const allModulesOn = () => Object.fromEntries(ALL_MODULES.map((k) => [k, true]));
+  const mod = (name) => { const m = modulesOn(); return m ? !!m[name] : true; };
+  const docKindsOn = () => Object.keys(DOC_KINDS).filter((k) => mod(DOC_KINDS[k].module));
+  // Abhängigkeiten auflösen: Einschalten zieht Voraussetzungen mit, Ausschalten nimmt Abhängige mit
+  function toggleModule(mods, key, on) {
+    const out = { ...mods, [key]: on };
+    if (on) {
+      const stack = [key];
+      while (stack.length) {
+        for (const r of MODULES[stack.pop()].requires || []) if (!out[r]) { out[r] = true; stack.push(r); }
+      }
+    } else {
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const [k, def] of Object.entries(MODULES)) {
+          if (out[k] && (def.requires || []).some((r) => !out[r])) { out[k] = false; changed = true; }
+        }
+      }
+    }
+    return out;
+  }
   const companyName = () => settings().name || (S.company && S.company.name) || '';
   const articles = () => memo('arts', () => all('articles').filter((a) => !a.archived).sort(byName));
   const articleRaw = (id) => (col('articles')[id] && col('articles')[id].data) || null;
@@ -466,8 +528,8 @@
     `<select name="${name}" ${attrs}>${options.map(([v, l]) => `<option value="${esc(v)}" ${String(v) === String(value ?? '') ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
   const textarea = (name, value = '', attrs = '') => `<textarea name="${name}" ${attrs}>${esc(value)}</textarea>`;
   const datalist = (id, values) => `<datalist id="${id}">${[...new Set(values)].map((v) => `<option value="${esc(v)}">`).join('')}</datalist>`;
-  const kpi = (label, value, tone = '', sub = '') =>
-    `<div class="kpi"><span class="label">${esc(label)}</span><span class="value ${tone}">${value}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</div>`;
+  const kpi = (label, value, tone = '', sub = '', ic = '') =>
+    `<div class="kpi">${ic ? `<span class="kpi-ic ${tone}">${icon(ic, 18)}</span>` : ''}<span class="label">${esc(label)}</span><span class="value ${tone}">${value}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</div>`;
   const empty = (ic, text, btn = '') => `<div class="empty">${icon(ic, 34)}<div>${text}</div>${btn}</div>`;
   const searchBox = (key, placeholder) =>
     `<label class="search">${icon('search', 16)}<input id="q-${key}" data-ui="${key}" value="${esc(UI.q[key] || '')}" placeholder="${esc(placeholder)}" type="search"></label>`;
@@ -588,18 +650,21 @@
     return { net, tax, gross: r2(net + tax), rates };
   }
   const docTotals = (d) => memo(`doc:${d.id}:${d.updatedAt}`, () => calcTotals(d.items));
+  // Bestand wird nur für Produkte geführt – und nur, wenn die Lagerverwaltung aktiv ist
+  const tracksStock = (a) => mod('inventory') && !!a && a.type !== 'service';
+  const isLate = (d) => d.status === 'open' && d.kind !== 'purchase' && !!d.dueDate && d.dueDate < today();
 
   function nextDocNumber(kind, date) {
-    const prefix = kind === 'sale' ? (settings().invoicePrefix || 'RE') : (settings().purchasePrefix || 'EK');
+    const K = DOC_KINDS[kind];
+    const prefix = String(settings()[K.prefixKey] || K.prefix).replace(/[^A-Za-z0-9]/g, '') || K.prefix;
     const year = String(date || today()).slice(0, 4);
-    const safePrefix = prefix.replace(/[^A-Za-z0-9]/g, '');
-    const re = new RegExp('^' + safePrefix + '-' + year + '-(\\d+)$');
+    const re = new RegExp('^' + prefix + '-' + year + '-(\\d+)$');
     let max = 0;
     for (const d of all('documents')) {
       const m = d.kind === kind && re.exec(d.number || '');
       if (m) max = Math.max(max, Number(m[1]));
     }
-    return `${safePrefix}-${year}-${String(max + 1).padStart(4, '0')}`;
+    return `${prefix}-${year}-${String(max + 1).padStart(4, '0')}`;
   }
   function nextCode(collection, prefix, keyName) {
     let max = 0;
@@ -617,21 +682,25 @@
     doc.status = 'open';
     doc.finalizedAt = Date.now();
     doc.movementIds = [];
-    for (const it of doc.items) {
-      if (!it.articleId || !num(it.qty)) continue;
-      const art = articleRaw(it.articleId);
-      const mv = put('movements', {
-        articleId: it.articleId,
-        qty: doc.kind === 'sale' ? -num(it.qty) : num(it.qty),
-        type: doc.kind,
-        date: doc.date,
-        unitCost: doc.kind === 'purchase' ? num(it.price) : num(art && art.ek),
-        docId: doc.id,
-        note: doc.number,
-      });
-      doc.movementIds.push(mv.id);
-      if (doc.kind === 'purchase' && art && num(it.price) > 0 && num(art.ek) !== num(it.price)) {
-        put('articles', { ...art, ek: num(it.price) }); // letzter Einkaufspreis
+    if (doc.kind !== 'quote') {
+      for (const it of doc.items) {
+        const art = it.articleId ? articleRaw(it.articleId) : null;
+        if (!art || !num(it.qty)) continue;
+        if (tracksStock(art)) {
+          const mv = put('movements', {
+            articleId: it.articleId,
+            qty: doc.kind === 'sale' ? -num(it.qty) : num(it.qty),
+            type: doc.kind,
+            date: doc.date,
+            unitCost: doc.kind === 'purchase' ? num(it.price) : num(art.ek),
+            docId: doc.id,
+            note: doc.number,
+          });
+          doc.movementIds.push(mv.id);
+        }
+        if (doc.kind === 'purchase' && num(it.price) > 0 && num(art.ek) !== num(it.price)) {
+          put('articles', { ...art, ek: num(it.price) }); // letzter Einkaufspreis
+        }
       }
     }
     return put('documents', doc);
@@ -640,10 +709,11 @@
     const t = calcTotals(doc.items);
     const sale = doc.kind === 'sale';
     const rate = t.rates.length === 1 ? t.rates[0].rate : null;
+    const hasGoods = doc.items.some((it) => { const a = articleRaw(it.articleId); return a && a.type !== 'service'; });
     const entry = put('entries', {
       date,
       kind: sale ? 'income' : 'expense',
-      category: sale ? 'Warenverkauf' : 'Wareneinkauf',
+      category: sale ? (hasGoods ? 'Warenverkauf' : 'Dienstleistung') : 'Wareneinkauf',
       description: `${doc.number} · ${(doc.contact && doc.contact.name) || ''}`.trim(),
       net: t.net, tax: t.tax, gross: t.gross, rate,
       method, ref: doc.number, docId: doc.id,
@@ -658,6 +728,17 @@
     if (doc.entryId && get('entries', doc.entryId)) del('entries', doc.entryId);
     return put('documents', { ...doc, status: 'cancelled', cancelledAt: Date.now(), entryId: null });
   }
+  // Angebot → Rechnungsentwurf (Positionen, Kunde und Texte werden übernommen)
+  function convertQuote(q) {
+    const s = settings();
+    const inv = put('documents', {
+      kind: 'sale', status: 'draft', date: today(), dueDate: addDays(today(), num(s.paymentDays) || 14),
+      contactId: q.contactId, contact: q.contact, items: JSON.parse(JSON.stringify(q.items)),
+      notes: '', reference: q.reference || q.number, fromQuote: q.id, fromQuoteNumber: q.number,
+    });
+    put('documents', { ...q, status: 'accepted', acceptedAt: today(), invoiceId: inv.id });
+    return inv;
+  }
   function splitGross(gross, rate) {
     const g = r2(gross);
     const net = r2(g / (1 + num(rate) / 100));
@@ -666,33 +747,86 @@
 
   // =============================================================== Shell & Rendering
   const VIEWS = {
-    dashboard: { title: 'Übersicht', icon: 'dashboard', render: viewDashboard },
-    articles: { title: 'Artikel', icon: 'box', render: viewArticles },
-    stock: { title: 'Lager', icon: 'layers', render: viewStock },
-    documents: { title: 'Belege', icon: 'file', render: viewDocuments },
-    entries: { title: 'Buchungen', icon: 'book', render: viewEntries },
-    contacts: { title: 'Kontakte', icon: 'users', render: viewContacts },
-    reports: { title: 'Berichte', icon: 'chart', render: viewReports },
-    settings: { title: 'Einstellungen', icon: 'settings', render: viewSettings },
+    dashboard: { title: 'Übersicht', short: 'Start', icon: 'dashboard', group: 'start', render: viewDashboard,
+      sub: () => new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) },
+    documents: { title: () => { const k = docKindsOn(); return k.length === 1 ? DOC_KINDS[k[0]].plural : 'Belege'; }, short: 'Belege', icon: 'file', group: 'business',
+      when: () => docKindsOn().length > 0, render: viewDocuments,
+      sub: () => { const p = docKindsOn().map((k) => DOC_KINDS[k].plural); return p.length > 1 ? `${p.slice(0, -1).join(', ')} & ${p[p.length - 1]}` : 'Schreiben, drucken, Zahlungen verbuchen'; } },
+    contacts: { title: 'Kontakte', short: 'Kontakte', icon: 'users', group: 'business', when: () => mod('contacts'), render: viewContacts, sub: 'Kunden und Lieferanten' },
+    articles: { title: () => (mod('inventory') ? 'Artikel & Leistungen' : 'Produkte & Leistungen'), short: 'Artikel', icon: 'tag', group: 'goods',
+      when: () => mod('catalog'), render: viewArticles,
+      sub: () => (mod('inventory') ? 'Artikelstamm mit Preisen und Beständen' : 'Deine Preisliste für Rechnungen und Angebote') },
+    stock: { title: 'Lager', short: 'Lager', icon: 'layers', group: 'goods', when: () => mod('inventory'), render: viewStock, sub: 'Bestände, Bewegungen und Inventur' },
+    entries: { title: 'Kassenbuch', short: 'Kasse', icon: 'book', group: 'money', render: viewEntries, sub: 'Alle Einnahmen und Ausgaben' },
+    reports: { title: 'Berichte', short: 'Berichte', icon: 'chart', group: 'money', when: () => mod('reports'), render: viewReports, sub: 'Gewinn, Umsatzsteuer und Exporte' },
+    settings: { title: 'Einstellungen', short: 'Einstellungen', icon: 'settings', group: 'system', render: viewSettings, sub: 'Funktionen, Firma, Team und Konto' },
   };
+  const GROUPS = { start: '', business: 'Verkauf & Einkauf', goods: 'Waren', money: 'Finanzen', system: '' };
+  const tv = (v, k) => (typeof v[k] === 'function' ? v[k]() : v[k]);
+  const viewOn = (k) => !!VIEWS[k] && (!VIEWS[k].when || VIEWS[k].when());
+
+  // Einträge für „+ Neu“ und die Schnellaktionen – je nach aktiven Funktionen
+  function quickItems() {
+    const items = [];
+    if (mod('invoices')) items.push(['new-doc', 'sale', 'file', 'Rechnung']);
+    if (mod('quotes')) items.push(['new-doc', 'quote', 'send', 'Angebot']);
+    items.push(['new-entry', 'income', 'trendUp', 'Einnahme'], ['new-entry', 'expense', 'trendDown', 'Ausgabe']);
+    if (mod('purchases')) items.push(['new-doc', 'purchase', 'cart', 'Einkauf']);
+    if (mod('inventory')) items.push(['move-in', '', 'layers', 'Wareneingang']);
+    if (mod('catalog')) items.push(['new-article', '', 'tag', mod('inventory') ? 'Artikel / Leistung' : 'Produkt / Leistung']);
+    if (mod('contacts')) items.push(['new-contact', '', 'users', 'Kontakt']);
+    return items;
+  }
+  const quickBtn = ([action, kind, ic, label], cls = '') =>
+    `<button type="button" class="${cls}" data-action="${action}" ${kind ? `data-kind="${kind}"` : ''}>${icon(ic, 18)}<span>${esc(label)}</span></button>`;
 
   function shellHtml() {
     return `<div id="shell" class="shell">
       <aside class="sidebar">
-        <div class="brand"><img src="/icon.svg" alt=""><div><div class="brand-name">NEXCOUNT</div><div class="brand-sub">by Andrerer</div></div></div>
-        <nav class="nav" id="nav">${Object.entries(VIEWS).map(([k, v]) => `<a href="#/${k}" data-route="${k}">${icon(v.icon)}<span>${v.title}</span><span class="count hidden"></span></a>`).join('')}</nav>
+        <a class="brand" href="#/dashboard"><img src="/icon.svg" alt=""><div><div class="brand-name">NEXCOUNT</div><div class="brand-sub">by Andrerer</div></div></a>
+        <nav class="nav" id="nav"></nav>
         <div class="sidebar-foot"><div class="avatar" id="me-avatar"></div><div class="who"><b id="me-name"></b><span id="me-company"></span></div>
           <button class="icon-btn" data-action="logout" title="Abmelden" aria-label="Abmelden">${icon('logout')}</button></div>
       </aside>
       <div class="main">
         <header class="topbar">
           <button class="icon-btn menu-btn" data-action="toggle-menu" aria-label="Menü">${icon('menu')}</button>
-          <h1 id="page-title"></h1>
-          <button id="sync-status" class="sync" data-action="sync-now" type="button"></button>
+          <div class="titles"><h1 id="page-title"></h1><p id="page-sub" class="page-sub"></p></div>
+          <div class="top-actions">
+            <div class="quick-wrap">
+              <button class="btn primary" data-action="quick-new" type="button" aria-haspopup="menu">${icon('plus', 16)}<span class="hide-sm">Neu</span></button>
+              <div class="menu" id="quick-menu" role="menu"></div>
+            </div>
+            <button id="sync-status" class="sync" data-action="sync-now" type="button"></button>
+          </div>
         </header>
         <main id="view" class="view"></main>
       </div>
+      <nav class="bottom-nav" id="bottom-nav"></nav>
     </div>`;
+  }
+
+  function renderNav() {
+    const st = stockMap();
+    const counts = {
+      articles: mod('inventory') ? articles().filter((a) => tracksStock(a) && isLow(a, st)).length : 0,
+      documents: mod('invoices') ? all('documents').filter((d) => d.kind === 'sale' && isLate(d)).length : 0,
+    };
+    let html = '';
+    let lastGroup = null;
+    for (const [k, v] of Object.entries(VIEWS)) {
+      if (!viewOn(k)) continue;
+      if (v.group !== lastGroup) {
+        if (GROUPS[v.group]) html += `<div class="nav-label">${GROUPS[v.group]}</div>`;
+        else if (lastGroup) html += '<div class="nav-sep"></div>';
+        lastGroup = v.group;
+      }
+      html += `<a href="#/${k}" class="${k === UI.route ? 'active' : ''}">${icon(v.icon)}<span>${esc(tv(v, 'title'))}</span>${counts[k] ? `<span class="count">${counts[k]}</span>` : ''}</a>`;
+    }
+    $('#nav').innerHTML = html;
+    const main = ['dashboard', 'documents', 'entries', 'articles', 'contacts', 'stock'].filter(viewOn).slice(0, 4);
+    $('#bottom-nav').innerHTML = main.map((k) => `<a href="#/${k}" class="${k === UI.route ? 'active' : ''}">${icon(VIEWS[k].icon, 20)}<span>${esc(VIEWS[k].short)}</span>${counts[k] ? '<i class="dot-badge"></i>' : ''}</a>`).join('')
+      + `<button type="button" data-action="toggle-menu" class="${['settings', 'reports', 'stock', 'contacts'].includes(UI.route) && !main.includes(UI.route) ? 'active' : ''}">${icon('more', 20)}<span>Mehr</span></button>`;
   }
 
   function render({ fromSync = false } = {}) {
@@ -700,23 +834,16 @@
     // ungespeicherte Eingaben in Seitenformularen nicht durch Live-Updates überschreiben
     if (fromSync && UI.formDirty && $('#shell')) return renderStatus();
     if (!$('#shell')) $('#app').innerHTML = shellHtml();
-    const view = VIEWS[UI.route] || VIEWS.dashboard;
-    // Navigation & Kopf
-    const st = stockMap();
-    const lowCount = articles().filter((a) => isLow(a, st)).length;
-    const overdue = all('documents').filter((d) => d.kind === 'sale' && d.status === 'open' && d.dueDate && d.dueDate < today()).length;
-    for (const a of $$('#nav a')) {
-      a.classList.toggle('active', a.dataset.route === UI.route);
-      const c = $('.count', a);
-      const n = a.dataset.route === 'articles' ? lowCount : a.dataset.route === 'documents' ? overdue : 0;
-      c.textContent = n;
-      c.classList.toggle('hidden', !n);
-    }
+    if (!viewOn(UI.route)) UI.route = 'dashboard';
+    const view = VIEWS[UI.route];
+    renderNav();
     $('#me-avatar').textContent = initials(S.user.name);
     $('#me-name').textContent = S.user.name;
     $('#me-company').textContent = companyName();
-    $('#page-title').textContent = view.title;
-    document.title = `${view.title} · NEXCOUNT`;
+    const title = tv(view, 'title');
+    $('#page-title').textContent = title;
+    $('#page-sub').textContent = tv(view, 'sub') || '';
+    document.title = `${title} · NEXCOUNT`;
     // Fokus erhalten (z. B. Suche während Live-Sync)
     const active = document.activeElement;
     const fid = active && active.id && $('#view').contains(active) ? active.id : null;
@@ -749,12 +876,18 @@
     el.title = S.syncError || (S.online ? 'Jetzt synchronisieren' : 'Keine Verbindung – Änderungen werden lokal gespeichert');
   }
 
+  function closeMenus() {
+    const m = $('#quick-menu');
+    if (m) m.classList.remove('open');
+    const shell = $('#shell');
+    if (shell) shell.classList.remove('menu-open');
+  }
+
   function onRoute() {
     const r = (location.hash.match(/^#\/(\w+)/) || [])[1];
     UI.route = VIEWS[r] ? r : 'dashboard';
     UI.formDirty = false;
-    const shell = $('#shell');
-    if (shell) shell.classList.remove('menu-open');
+    closeMenus();
     if (S.user) {
       render();
       window.scrollTo(0, 0);
@@ -824,13 +957,14 @@
         ${inner}
       </div>
       <div class="auth-hero">
-        <h2>Buchhaltung und Lager in einem – live synchronisiert.</h2>
-        <p>NEXCOUNT verbindet Rechnungen, Kassenbuch und Warenwirtschaft. Alle Geräte deines Teams sehen Änderungen in Echtzeit – auch offline geht nichts verloren.</p>
+        <span class="hero-eyebrow">NEXCOUNT by Andrerer</span>
+        <h2>Das Buchhaltungs- und Lagersystem für die Kleinen.</h2>
+        <p>Rechnungen, Angebote, Kassenbuch – und ein Lager, wenn du eins brauchst. Du schaltest ein, was zu deinem Betrieb passt. Alle Geräte deines Teams bleiben live synchronisiert.</p>
         <ul>
-          <li>${icon('zap', 20)}<div><b>Echtzeit-Synchronisierung</b><span>Änderungen erscheinen sofort auf allen angemeldeten Geräten.</span></div></li>
-          <li>${icon('cloud', 20)}<div><b>Offline-fähig</b><span>Weiterarbeiten ohne Netz – Änderungen werden automatisch nachgereicht.</span></div></li>
-          <li>${icon('layers', 20)}<div><b>Lager & Belege verknüpft</b><span>Rechnungen buchen Bestände und Einnahmen automatisch.</span></div></li>
-          <li>${icon('shield', 20)}<div><b>Team & Rollen</b><span>Mitarbeiter per Einladungscode hinzufügen, Admins verwalten Zugänge.</span></div></li>
+          <li>${icon('sliders', 20)}<div><b>Nur was du brauchst</b><span>Dienstleister, Laden oder Werkstatt: Funktionen einfach an- und ausschalten.</span></div></li>
+          <li>${icon('file', 20)}<div><b>Angebot → Rechnung → Kassenbuch</b><span>Mit einem Klick umwandeln, Zahlungen landen automatisch in der Buchhaltung.</span></div></li>
+          <li>${icon('zap', 20)}<div><b>Live & offline</b><span>Änderungen erscheinen sofort auf allen Geräten – ohne Netz wird später nachgereicht.</span></div></li>
+          <li>${icon('shield', 20)}<div><b>Sicher im Team</b><span>Einladungscode für Mitarbeiter, Rollen für Admins, Daten strikt je Firma getrennt.</span></div></li>
         </ul>
       </div>
     </div>`;
@@ -860,77 +994,163 @@
   }
 
   // =============================================================== Ansicht: Übersicht
-  function viewDashboard() {
-    const arts = articles();
-    const entries = all('entries');
-    const docs = all('documents');
-    if (!arts.length && !entries.length && !docs.length && !all('contacts').length) return welcomeHtml();
-    const ym = today().slice(0, 7);
-    const mEntries = entries.filter((e) => String(e.date || '').startsWith(ym));
-    const inc = sum(mEntries.filter((e) => e.kind === 'income'), (e) => e.net);
-    const exp = sum(mEntries.filter((e) => e.kind === 'expense'), (e) => e.net);
-    const st = stockMap();
-    const stockValue = sum(arts, (a) => Math.max(0, st[a.id] || 0) * num(a.ek));
-    const open = docs.filter((d) => d.kind === 'sale' && d.status === 'open').sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)));
-    const openSum = sum(open, (d) => docTotals(d).gross);
-    const overdue = open.filter((d) => d.dueDate && d.dueDate < today());
-    const low = arts.filter((a) => isLow(a, st));
-    const months = lastMonths(6).map((k) => {
-      const es = entries.filter((e) => String(e.date || '').startsWith(k));
-      return { label: monthLabel(k), a: sum(es.filter((e) => e.kind === 'income'), (e) => e.net), b: sum(es.filter((e) => e.kind === 'expense'), (e) => e.net) };
-    });
-    const recent = entries.slice().sort(byDateDesc).slice(0, 6);
-    return `
-      <div class="kpis">
-        ${kpi('Einnahmen · Monat (netto)', money(inc), 'pos')}
-        ${kpi('Ausgaben · Monat (netto)', money(exp), 'neg')}
-        ${kpi('Ergebnis · Monat', money(inc - exp), inc - exp >= 0 ? 'pos' : 'neg')}
-        ${kpi('Offene Forderungen', money(openSum), '', `${open.length} Rechnung(en)${overdue.length ? ` · <span class="neg">${overdue.length} überfällig</span>` : ''}`)}
-        ${kpi('Lagerwert (EK)', money(stockValue), '', `${arts.length} Artikel · ${low.length} unter Mindestbestand`)}
-      </div>
-      <div class="grid-2">
-        <section class="card"><div class="card-head"><h3>Einnahmen & Ausgaben</h3><span class="muted">letzte 6 Monate, netto</span></div>${barChart(months)}</section>
-        <section class="card"><div class="card-head"><h3>Niedriger Lagerbestand</h3><a href="#/articles" data-action="set-ui" data-k="artLow" data-v="1">Alle anzeigen</a></div>
-          ${low.length ? `<ul class="list">${low.slice(0, 7).map((a) => {
-            const s = st[a.id] || 0;
-            const pct = Math.max(4, Math.min(100, (s / num(a.min)) * 100));
-            return `<li class="clickable" data-action="move-in" data-id="${a.id}"><div><b>${esc(a.name)}</b><div class="bar-meter" style="margin-top:6px"><span style="width:${pct}%"></span></div></div><span class="num"><b>${fmtNum(s)}</b> <span class="muted small">/ ${fmtNum(a.min)} ${esc(a.unit || '')}</span></span></li>`;
-          }).join('')}</ul>` : empty('check', 'Alle Artikel sind ausreichend vorrätig.')}
-        </section>
-      </div>
-      <div class="grid-2">
-        <section class="card"><div class="card-head"><h3>Offene Rechnungen</h3><a href="#/documents">Zu den Belegen</a></div>
-          ${open.length ? `<ul class="list">${open.slice(0, 6).map((d) => {
-            const od = d.dueDate && d.dueDate < today();
-            return `<li class="clickable" data-action="open-doc" data-id="${d.id}"><div><b>${esc(d.number)} · ${esc((d.contact && d.contact.name) || '—')}</b><span class="sub">fällig ${fmtDate(d.dueDate)}</span></div>${od ? '<span class="badge overdue">überfällig</span>' : ''}<span class="num"><b>${money(docTotals(d).gross)}</b></span></li>`;
-          }).join('')}</ul>` : empty('check', 'Keine offenen Rechnungen.')}
-        </section>
-        <section class="card"><div class="card-head"><h3>Letzte Buchungen</h3><a href="#/entries">Kassenbuch</a></div>
-          ${recent.length ? `<ul class="list">${recent.map((e) => `<li class="clickable" data-action="edit-entry" data-id="${e.id}"><div><b>${esc(e.description || e.category)}</b><span class="sub">${fmtDate(e.date)} · ${esc(e.category || '')} · ${esc(e.method || '')}</span></div><span class="num ${e.kind === 'income' ? 'pos' : 'neg'}"><b>${e.kind === 'income' ? '+' : '−'}${money(e.gross)}</b></span></li>`).join('')}</ul>` : empty('book', 'Noch keine Buchungen.')}
-        </section>
-      </div>`;
+  const hasBusinessData = () => ['articles', 'entries', 'documents', 'contacts', 'movements'].some((c) => all(c).length > 0);
+  const needsSetup = () => !modulesOn() && !settings().setupDone && S.lastSync > 0 && !hasBusinessData();
+  const greeting = () => { const h = new Date().getHours(); return h < 11 ? 'Guten Morgen' : h < 18 ? 'Hallo' : 'Guten Abend'; };
+  const firstName = () => esc(String(S.user.name || '').split(' ')[0]);
+
+  // Liste der Funktionen mit Schaltern (Einrichtung und Einstellungen)
+  function moduleList(mods, scope, readOnly = false) {
+    const row = (k, def, on, fixed) => {
+      const needs = (def.requires || []).map((r) => MODULES[r].label);
+      return `<label class="module ${on ? 'on' : ''} ${readOnly || fixed ? 'ro' : ''}">
+        <span class="module-ic">${icon(def.icon, 18)}</span>
+        <span class="module-txt"><b>${esc(def.label)}</b><small>${esc(def.desc)}${needs.length ? ` <em>Benötigt: ${esc(needs.join(', '))}</em>` : ''}</small></span>
+        <input type="checkbox" class="switch" ${fixed ? '' : `data-module="${k}" data-scope="${scope}"`} ${on ? 'checked' : ''} ${readOnly || fixed ? 'disabled' : ''} aria-label="${esc(def.label)}">
+      </label>`;
+    };
+    return `<div class="module-list">
+      ${row('entries', { label: 'Kassenbuch', icon: 'book', desc: 'Einnahmen und Ausgaben – das Herz deiner Buchhaltung. Immer aktiv.' }, true, true)}
+      ${ALL_MODULES.map((k) => row(k, MODULES[k], !!mods[k], false)).join('')}
+    </div>`;
   }
+
+  function setupHtml() {
+    const st = UI.setup || (UI.setup = { preset: '', modules: allModulesOn(), smallBusiness: !!settings().smallBusiness });
+    return `<section class="card setup">
+      <div class="setup-head">
+        <span class="eyebrow">${icon('sparkle', 14)} Willkommen bei NEXCOUNT</span>
+        <h2>${greeting()}, ${firstName()}! Was brauchst du?</h2>
+        <p class="muted">Nicht jeder braucht ein Lager. Wähle eine Vorlage für deinen Betrieb und passe die Funktionen an – alles lässt sich später unter <b>Einstellungen → Funktionen</b> ändern.</p>
+      </div>
+      <div class="preset-grid">${Object.entries(PRESETS).map(([k, p]) => `<button type="button" class="preset ${st.preset === k ? 'active' : ''}" data-action="setup-preset" data-preset="${k}">
+          <span class="preset-ic">${icon(p.icon, 20)}</span><b>${esc(p.label)}</b><small>${esc(p.desc)}</small></button>`).join('')}</div>
+      <div class="setup-cols">
+        <div><h3 class="section-title">Funktionen</h3>${moduleList(st.modules, 'setup')}</div>
+        <div class="setup-side">
+          <h3 class="section-title">Steuern</h3>
+          <label class="check"><input type="checkbox" data-setup="smallBusiness" ${st.smallBusiness ? 'checked' : ''}> Kleinunternehmer nach § 19 UStG</label>
+          <p class="muted small">Dann weist NEXCOUNT auf Rechnungen und Angeboten keine Umsatzsteuer aus.</p>
+          <div class="summary-box">
+            <b>${Object.values(st.modules).filter(Boolean).length + 1} von ${ALL_MODULES.length + 1} Funktionen aktiv</b>
+            <span class="muted small">${['Kassenbuch', ...ALL_MODULES.filter((k) => st.modules[k]).map((k) => MODULES[k].label)].join(' · ')}</span>
+          </div>
+          <button class="btn primary block" data-action="setup-finish">Los geht's ${icon('arrowRight', 16)}</button>
+        </div>
+      </div>
+    </section>`;
+  }
+
   function welcomeHtml() {
+    const admin = S.user.role === 'admin';
+    const steps = [
+      ['Firmendaten hinterlegen', 'Adresse, Steuernummer und Bankverbindung für deine Belege.', '#/settings', 'company'],
+      mod('catalog') && [mod('inventory') ? 'Artikel & Anfangsbestände erfassen' : 'Produkte & Leistungen anlegen', 'Mit Preisen – dann sind Rechnungspositionen ein Klick.', '#/articles'],
+      mod('contacts') && ['Kunden anlegen', 'Unter Kontakte – inklusive Lieferanten.', '#/contacts'],
+      ['Team einladen', 'Einladungscode unter Einstellungen → Team teilen.', '#/settings', 'team'],
+    ].filter(Boolean);
     return `<div class="welcome">
-      <section class="card hero">
-        <h2>Willkommen bei NEXCOUNT, ${esc(S.user.name.split(' ')[0])}!</h2>
-        <p>Deine Firma <b>${esc(companyName())}</b> ist eingerichtet. Alles, was du anlegst, wird automatisch mit allen Geräten deines Teams synchronisiert.</p>
-        <div class="toolbar"><button class="btn" data-action="new-article">${icon('plus', 16)} Ersten Artikel anlegen</button><button class="btn ghost" data-action="demo">Demo-Daten laden</button></div>
+      <section class="hero-card">
+        <span class="eyebrow">${icon('sparkle', 14)} ${esc(companyName())}</span>
+        <h2>${greeting()}, ${firstName()}!</h2>
+        <p>Alles ist eingerichtet. Womit möchtest du anfangen?</p>
+        <div class="quick-actions">${quickItems().slice(0, 6).map((q) => quickBtn(q, 'qa')).join('')}</div>
+        <div class="toolbar">${admin ? `<button class="btn ghost light" data-action="demo">${icon('sparkle', 16)} Mit Beispieldaten ausprobieren</button>` : ''}
+          <a class="btn ghost light" href="#/settings" data-action="set-ui" data-k="setTab" data-v="features">${icon('sliders', 16)} Funktionen anpassen</a></div>
       </section>
       <section class="card">
-        <div class="card-head"><h3>In 4 Schritten startklar</h3></div>
-        <ol class="steps">
-          <li><div><b>Firmendaten hinterlegen</b><div class="muted small">Adresse, Steuernummer und Bankverbindung für Rechnungen – <a href="#/settings">Einstellungen</a>.</div></div></li>
-          <li><div><b>Artikel & Anfangsbestände erfassen</b><div class="muted small">Mit Einkaufs- und Verkaufspreis, Mindestbestand und Lagerort.</div></div></li>
-          <li><div><b>Kunden & Lieferanten anlegen</b><div class="muted small">Unter <a href="#/contacts">Kontakte</a>.</div></div></li>
-          <li><div><b>Team einladen</b><div class="muted small">Einladungscode unter Einstellungen → Team teilen.</div></div></li>
-        </ol>
+        <div class="card-head"><h3>In ${steps.length} Schritten startklar</h3></div>
+        <ol class="steps">${steps.map(([t, d, href, tab]) => `<li><div><b>${t}</b><div class="muted small">${d} ${tab ? `<a href="${href}" data-action="set-ui" data-k="setTab" data-v="${tab}">Öffnen</a>` : `<a href="${href}">Öffnen</a>`}</div></div></li>`).join('')}</ol>
       </section>
     </div>`;
   }
 
-  // =============================================================== Ansicht: Artikel
+  function viewDashboard() {
+    if (!S.lastSync && S.online && !hasBusinessData()) return `<div class="card loading-card">${icon('sync', 22)}<span>Daten werden geladen …</span></div>`;
+    if (needsSetup()) return S.user.role === 'admin' ? setupHtml() : welcomeHtml();
+    if (!hasBusinessData()) return welcomeHtml();
+
+    const entries = all('entries');
+    const docs = all('documents');
+    const ym = today().slice(0, 7);
+    const monthName = new Date().toLocaleDateString('de-DE', { month: 'long' });
+    const mE = entries.filter((e) => String(e.date || '').startsWith(ym));
+    const inc = sum(mE.filter((e) => e.kind === 'income'), (e) => e.net);
+    const exp = sum(mE.filter((e) => e.kind === 'expense'), (e) => e.net);
+    const open = mod('invoices') ? docs.filter((d) => d.kind === 'sale' && d.status === 'open').sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate))) : [];
+    const overdue = open.filter(isLate);
+    const quotes = mod('quotes') ? docs.filter((d) => d.kind === 'quote' && d.status === 'open').sort(byDateDesc) : [];
+    const st = stockMap();
+    const stockArts = mod('inventory') ? articles().filter(tracksStock) : [];
+    const low = stockArts.filter((a) => isLow(a, st));
+
+    const kpis = [
+      kpi('Einnahmen', money(inc), 'pos', `${monthName} · netto`, 'trendUp'),
+      kpi('Ausgaben', money(exp), 'neg', `${monthName} · netto`, 'trendDown'),
+      kpi('Ergebnis', money(inc - exp), inc - exp >= 0 ? 'pos' : 'neg', monthName, 'wallet'),
+    ];
+    if (mod('invoices')) kpis.push(kpi('Offene Rechnungen', money(sum(open, (d) => docTotals(d).gross)), '', `${open.length} offen${overdue.length ? ` · <span class="neg">${overdue.length} überfällig</span>` : ''}`, 'file'));
+    if (mod('quotes')) kpis.push(kpi('Offene Angebote', money(sum(quotes, (d) => docTotals(d).gross)), '', `${quotes.length} versendet`, 'send'));
+    if (mod('inventory')) kpis.push(kpi('Lagerwert', money(sum(stockArts, (a) => Math.max(0, st[a.id] || 0) * num(a.ek))), '', `${low.length} unter Mindestbestand`, 'layers'));
+
+    let note = 'Alles im grünen Bereich.';
+    if (overdue.length) note = `${overdue.length} ${overdue.length === 1 ? 'Rechnung ist' : 'Rechnungen sind'} überfällig.`;
+    else if (low.length) note = `${low.length} ${low.length === 1 ? 'Artikel liegt' : 'Artikel liegen'} unter dem Mindestbestand.`;
+    else if (open.length) note = `${open.length} ${open.length === 1 ? 'Rechnung wartet' : 'Rechnungen warten'} auf Zahlung.`;
+
+    const months = lastMonths(6).map((k) => {
+      const es = entries.filter((e) => String(e.date || '').startsWith(k));
+      return { label: monthLabel(k), a: sum(es.filter((e) => e.kind === 'income'), (e) => e.net), b: sum(es.filter((e) => e.kind === 'expense'), (e) => e.net) };
+    });
+
+    const panels = [`<section class="card"><div class="card-head"><h3>Einnahmen & Ausgaben</h3><span class="muted">letzte 6 Monate, netto</span></div>${barChart(months)}</section>`];
+    if (mod('invoices')) {
+      panels.push(`<section class="card"><div class="card-head"><h3>Offene Rechnungen</h3><a href="#/documents" data-action="set-ui" data-k="docKind" data-v="sale">Alle anzeigen</a></div>
+        ${open.length ? `<ul class="list">${open.slice(0, 6).map((d) => `<li class="clickable" data-action="open-doc" data-id="${d.id}"><div><b>${esc(d.number)} · ${esc((d.contact && d.contact.name) || '—')}</b><span class="sub">fällig ${fmtDate(d.dueDate)}</span></div>${isLate(d) ? '<span class="badge overdue">überfällig</span>' : ''}<span class="num"><b>${money(docTotals(d).gross)}</b></span></li>`).join('')}</ul>`
+        : empty('check', 'Keine offenen Rechnungen.')}</section>`);
+    }
+    if (mod('inventory')) {
+      panels.push(`<section class="card"><div class="card-head"><h3>Niedriger Lagerbestand</h3><a href="#/articles" data-action="set-ui" data-k="artLow" data-v="1">Alle anzeigen</a></div>
+        ${low.length ? `<ul class="list">${low.slice(0, 7).map((a) => {
+          const s = st[a.id] || 0;
+          const pct = Math.max(4, Math.min(100, (s / num(a.min)) * 100));
+          return `<li class="clickable" data-action="move-in" data-id="${a.id}"><div><b>${esc(a.name)}</b><div class="bar-meter" style="margin-top:6px"><span style="width:${pct}%"></span></div></div><span class="num"><b>${fmtNum(s)}</b> <span class="muted small">/ ${fmtNum(a.min)} ${esc(a.unit || '')}</span></span></li>`;
+        }).join('')}</ul>` : empty('check', 'Alle Artikel sind ausreichend vorrätig.')}</section>`);
+    }
+    if (mod('quotes')) {
+      panels.push(`<section class="card"><div class="card-head"><h3>Offene Angebote</h3><a href="#/documents" data-action="set-ui" data-k="docKind" data-v="quote">Alle anzeigen</a></div>
+        ${quotes.length ? `<ul class="list">${quotes.slice(0, 6).map((d) => `<li class="clickable" data-action="open-doc" data-id="${d.id}"><div><b>${esc(d.number)} · ${esc((d.contact && d.contact.name) || '—')}</b><span class="sub">gültig bis ${fmtDate(d.dueDate) || '—'}</span></div>${isLate(d) ? '<span class="badge overdue">abgelaufen</span>' : ''}<span class="num"><b>${money(docTotals(d).gross)}</b></span></li>`).join('')}</ul>`
+        : empty('send', 'Keine offenen Angebote.')}</section>`);
+    }
+    const recent = entries.slice().sort(byDateDesc).slice(0, 6);
+    panels.push(`<section class="card"><div class="card-head"><h3>Letzte Buchungen</h3><a href="#/entries">Kassenbuch</a></div>
+      ${recent.length ? `<ul class="list">${recent.map((e) => `<li class="clickable" data-action="edit-entry" data-id="${e.id}"><div><b>${esc(e.description || e.category)}</b><span class="sub">${fmtDate(e.date)} · ${esc(e.category || '')} · ${esc(e.method || '')}</span></div><span class="num ${e.kind === 'income' ? 'pos' : 'neg'}"><b>${e.kind === 'income' ? '+' : '−'}${money(e.gross)}</b></span></li>`).join('')}</ul>`
+      : empty('book', 'Noch keine Buchungen.')}</section>`);
+
+    const tip = !modulesOn() && S.user.role === 'admin'
+      ? `<section class="tip-card">${icon('sliders', 20)}<div><b>Neu: Nur die Funktionen, die du brauchst</b><span>Schalte z. B. das Lager ab, wenn du nur Dienstleistungen abrechnest.</span></div><a class="btn sm" href="#/settings" data-action="set-ui" data-k="setTab" data-v="features">Anpassen</a></section>`
+      : '';
+
+    return `
+      <section class="hero-card">
+        <div class="hero-text"><span class="eyebrow">${esc(companyName())}</span><h2>${greeting()}, ${firstName()}!</h2><p>${note}</p></div>
+        <div class="quick-actions">${quickItems().slice(0, 4).map((q) => quickBtn(q, 'qa')).join('')}</div>
+      </section>
+      ${tip}
+      <div class="kpis">${kpis.join('')}</div>
+      <div class="grid-2 panels">${panels.join('')}</div>`;
+  }
+
+  // =============================================================== Ansicht: Artikel / Produkte & Leistungen
+  const stockArticles = () => articles().filter((a) => a.type !== 'service');
+  function articleOptions(selected, { withStock = true, placeholder = 'Artikel wählen …', productsOnly = false } = {}) {
+    const st = stockMap();
+    const list = productsOnly ? stockArticles() : articles();
+    return `<option value="">${esc(placeholder)}</option>${list.map((a) => `<option value="${a.id}" ${a.id === selected ? 'selected' : ''}>${esc(a.sku)} – ${esc(a.name)}${withStock && tracksStock(a) ? ` (${fmtNum(st[a.id] || 0)} ${esc(a.unit || '')})` : ''}</option>`).join('')}`;
+  }
+
   function viewArticles() {
+    const inv = mod('inventory');
     const st = stockMap();
     const all_ = articles();
     const cats = [...new Set(all_.map((a) => a.category).filter(Boolean))].sort();
@@ -938,93 +1158,138 @@
     let list = all_;
     if (q) list = list.filter((a) => [a.sku, a.name, a.category, a.location, a.ean].join(' ').toLowerCase().includes(q));
     if (UI.q.artCat) list = list.filter((a) => a.category === UI.q.artCat);
-    if (UI.q.artLow === '1') list = list.filter((a) => isLow(a, st));
-    const value = sum(list, (a) => Math.max(0, st[a.id] || 0) * num(a.ek));
+    if (UI.q.artType) list = list.filter((a) => (a.type || 'product') === UI.q.artType);
+    if (inv && UI.q.artLow === '1') list = list.filter((a) => tracksStock(a) && isLow(a, st));
+    const value = sum(list, (a) => (tracksStock(a) ? Math.max(0, st[a.id] || 0) * num(a.ek) : 0));
+    const typeBadge = (a) => (a.type === 'service' ? '<span class="badge info">Leistung</span>' : '');
+    const marginOf = (a) => { const vk = num(a.vk); return vk > 0 && num(a.ek) > 0 ? ((vk - num(a.ek)) / vk) * 100 : null; };
+    const marginCell = (a) => { const m = marginOf(a); return `<td class="num ${m != null && m < 0 ? 'neg' : ''}">${m == null ? '—' : `${m.toFixed(1).replace('.', ',')} %`}</td>`; };
+
+    const head = inv
+      ? '<th>Nr.</th><th>Bezeichnung</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">EK netto</th><th class="num">VK netto</th><th class="num">Marge</th><th class="num">Lagerwert</th><th>Lagerort</th><th></th>'
+      : '<th>Nr.</th><th>Bezeichnung</th><th>Kategorie</th><th>Einheit</th><th class="num">Preis netto</th><th class="num">USt</th><th class="num">Marge</th>';
+    const rowHtml = (a) => {
+      const s = st[a.id] || 0;
+      if (!inv) {
+        return `<tr class="clickable" data-action="edit-article" data-id="${a.id}">
+          <td class="muted">${esc(a.sku)}</td><td><b>${esc(a.name)}</b> ${typeBadge(a)}${a.description ? `<span class="sub">${esc(a.description.slice(0, 80))}</span>` : ''}</td>
+          <td>${esc(a.category || '—')}</td><td>${esc(a.unit || '')}</td><td class="num"><b>${money(a.vk)}</b></td><td class="num muted">${num(a.tax)} %</td>${marginCell(a)}</tr>`;
+      }
+      const stockCell = !tracksStock(a) ? '<span class="muted">—</span>'
+        : isLow(a, st) ? `<span class="badge low">${fmtNum(s)} ${esc(a.unit || '')}</span>` : `${fmtNum(s)} <span class="muted">${esc(a.unit || '')}</span>`;
+      return `<tr class="clickable" data-action="edit-article" data-id="${a.id}">
+        <td class="muted">${esc(a.sku)}</td>
+        <td><b>${esc(a.name)}</b> ${typeBadge(a)}${a.ean ? `<span class="sub">EAN ${esc(a.ean)}</span>` : ''}</td>
+        <td>${esc(a.category || '—')}</td>
+        <td class="num">${stockCell}</td>
+        <td class="num">${money(a.ek)}</td>
+        <td class="num">${money(a.vk)}</td>
+        ${marginCell(a)}
+        <td class="num">${tracksStock(a) ? money(Math.max(0, s) * num(a.ek)) : '—'}</td>
+        <td>${esc(a.location || '—')}</td>
+        <td class="actions">${tracksStock(a) ? `<button class="btn sm" data-action="move-in" data-id="${a.id}" title="Wareneingang">${icon('plus', 14)}</button>
+          <button class="btn sm" data-action="move-out" data-id="${a.id}" title="Warenausgang">${icon('minus', 14)}</button>` : ''}</td></tr>`;
+    };
+
     return `
       <div class="toolbar">
-        ${searchBox('art', 'Artikel suchen (Nr., Name, EAN, Lagerort) …')}
-        ${uiSelect('artCat', [['', 'Alle Kategorien'], ...cats.map((c) => [c, c])])}
-        ${uiSelect('artLow', [['', 'Alle Bestände'], ['1', 'Nur unter Mindestbestand']])}
-        <div class="actions"><button class="btn primary" data-action="new-article">${icon('plus', 16)} Artikel</button></div>
+        ${searchBox('art', inv ? 'Suchen (Nr., Name, EAN, Lagerort) …' : 'Produkte und Leistungen suchen …')}
+        ${uiSelect('artType', [['', 'Produkte & Leistungen'], ['product', 'Nur Produkte'], ['service', 'Nur Leistungen']])}
+        ${cats.length ? uiSelect('artCat', [['', 'Alle Kategorien'], ...cats.map((c) => [c, c])]) : ''}
+        ${inv ? uiSelect('artLow', [['', 'Alle Bestände'], ['1', 'Unter Mindestbestand']]) : ''}
+        <div class="actions">
+          <button class="btn" data-action="new-article" data-kind="service">${icon('briefcase', 16)} Leistung</button>
+          <button class="btn primary" data-action="new-article" data-kind="product">${icon('plus', 16)} Produkt</button>
+        </div>
       </div>
       <section class="card flush">
         ${list.length ? `<div class="table-wrap"><table>
-          <thead><tr><th>Art.-Nr.</th><th>Bezeichnung</th><th>Kategorie</th><th class="num">Bestand</th><th class="num">EK netto</th><th class="num">VK netto</th><th class="num">Marge</th><th class="num">Lagerwert</th><th>Lagerort</th><th></th></tr></thead>
-          <tbody>${list.map((a) => {
-            const s = st[a.id] || 0;
-            const vk = num(a.vk);
-            const margin = vk > 0 ? ((vk - num(a.ek)) / vk) * 100 : null;
-            return `<tr class="clickable" data-action="edit-article" data-id="${a.id}">
-              <td><b>${esc(a.sku)}</b></td>
-              <td>${esc(a.name)}${a.ean ? `<span class="sub">EAN ${esc(a.ean)}</span>` : ''}</td>
-              <td>${esc(a.category || '—')}</td>
-              <td class="num">${isLow(a, st) ? `<span class="badge low">${fmtNum(s)} ${esc(a.unit || '')}</span>` : `${fmtNum(s)} <span class="muted">${esc(a.unit || '')}</span>`}</td>
-              <td class="num">${money(a.ek)}</td>
-              <td class="num">${money(a.vk)}</td>
-              <td class="num ${margin != null && margin < 0 ? 'neg' : ''}">${margin == null ? '—' : `${margin.toFixed(1).replace('.', ',')} %`}</td>
-              <td class="num">${money(Math.max(0, s) * num(a.ek))}</td>
-              <td>${esc(a.location || '—')}</td>
-              <td class="actions">
-                <button class="btn sm" data-action="move-in" data-id="${a.id}" title="Wareneingang">${icon('plus', 14)}</button>
-                <button class="btn sm" data-action="move-out" data-id="${a.id}" title="Warenausgang">${icon('minus', 14)}</button>
-              </td></tr>`;
-          }).join('')}</tbody>
-          <tfoot><tr><td colspan="7">${list.length} Artikel</td><td class="num">${money(value)}</td><td colspan="2"></td></tr></tfoot>
-        </table></div>` : empty('box', all_.length ? 'Keine Artikel für diesen Filter.' : 'Noch keine Artikel angelegt.', all_.length ? '' : `<button class="btn primary" data-action="new-article">${icon('plus', 16)} Ersten Artikel anlegen</button>`)}
+          <thead><tr>${head}</tr></thead>
+          <tbody>${list.map(rowHtml).join('')}</tbody>
+          ${inv ? `<tfoot><tr><td colspan="7">${list.length} Einträge</td><td class="num">${money(value)}</td><td colspan="2"></td></tr></tfoot>` : `<tfoot><tr><td colspan="7">${list.length} Einträge</td></tr></tfoot>`}
+        </table></div>`
+        : empty('tag', all_.length ? 'Nichts gefunden für diesen Filter.' : 'Noch nichts angelegt. Lege deine Produkte und Leistungen mit Preisen an – dann sind Rechnungspositionen nur noch ein Klick.',
+          all_.length ? '' : `<div class="toolbar"><button class="btn" data-action="new-article" data-kind="service">${icon('briefcase', 16)} Leistung anlegen</button><button class="btn primary" data-action="new-article" data-kind="product">${icon('plus', 16)} Produkt anlegen</button></div>`)}
       </section>`;
   }
 
-  function openArticle(id) {
+  function openArticle(id, presetType) {
     const a = id ? get('articles', id) : null;
     const isNew = !a;
+    const inv = mod('inventory');
     const smallBiz = !!settings().smallBusiness;
-    const d = a || { sku: nextCode('articles', 'A', 'sku'), unit: 'Stk', tax: smallBiz ? 0 : 19, ek: '', vk: '', min: '' };
+    const type0 = (a && a.type) || (presetType === 'service' || presetType === 'product' ? presetType : (inv ? 'product' : 'service'));
+    const d = a || { sku: nextCode('articles', 'A', 'sku'), unit: type0 === 'service' ? 'Std' : 'Stk', tax: smallBiz ? 0 : 19, ek: '', vk: '', min: '' };
     const cats = all('articles').map((x) => x.category).filter(Boolean);
     const locs = all('articles').map((x) => x.location).filter(Boolean);
     const st = stockMap();
+    const stockFields = inv ? `
+          ${field('EAN / Barcode', inp('ean', d.ean, 'maxlength="40" inputmode="numeric"'), 'only-product')}
+          ${field('Lagerort', inp('location', d.location, 'list="dl-loc" maxlength="60" placeholder="z. B. Regal A3"'), 'only-product')}
+          ${field('Mindestbestand', numInp('min', d.min, 'min="0"'), 'only-product')}
+          ${isNew ? field('Anfangsbestand', numInp('initial', '', 'min="0" placeholder="0"'), 'only-product')
+            : field('Aktueller Bestand', `<input readonly value="${esc(`${fmtNum(st[a.id] || 0)} ${a.unit || ''}`)}">`, 'only-product')}` : '';
     openModal({
-      title: isNew ? 'Neuer Artikel' : `Artikel ${a.sku}`,
+      title: isNew ? (type0 === 'service' ? 'Neue Leistung' : 'Neues Produkt') : a.name,
       body: `<div class="grid2">
-          ${field('Artikelnummer', inp('sku', d.sku, 'required maxlength="40"'))}
-          ${field('EAN / Barcode', inp('ean', d.ean, 'maxlength="40" inputmode="numeric"'))}
+          ${field('Art', selectEl('type', Object.entries(ART_TYPES), type0))}
+          ${field('Nummer', inp('sku', d.sku, 'required maxlength="40"'))}
           ${field('Bezeichnung', inp('name', d.name, 'required maxlength="160"'), 'span2')}
           ${field('Kategorie', inp('category', d.category, 'list="dl-cat" maxlength="60"'))}
           ${field('Einheit', inp('unit', d.unit, 'list="dl-unit" maxlength="20"'))}
-          ${field('Einkaufspreis netto (€)', numInp('ek', d.ek, 'min="0"'))}
           ${field('Verkaufspreis netto (€)', numInp('vk', d.vk, 'min="0"'))}
           ${field('USt-Satz', selectEl('tax', RATES, d.tax ?? 19))}
-          ${field('Mindestbestand', numInp('min', d.min, 'min="0"'))}
-          ${field('Lagerort', inp('location', d.location, 'list="dl-loc" maxlength="60" placeholder="z. B. Regal A3"'))}
-          ${isNew ? field('Anfangsbestand', numInp('initial', '', 'min="0" placeholder="0"')) : field('Aktueller Bestand', `<input readonly value="${esc(`${fmtNum(st[a.id] || 0)} ${a.unit || ''}`)}">`)}
-          ${field('Beschreibung / Notizen', textarea('description', d.description, 'maxlength="2000"'), 'span2')}
+          ${field(inv ? 'Einkaufspreis / Kosten netto (€)' : 'Eigene Kosten netto (€, optional)', numInp('ek', d.ek, 'min="0"'))}
+          <div class="field"><span>Marge</span><input id="art-margin" readonly></div>
+          ${stockFields}
+          ${field('Beschreibung (erscheint nicht auf Belegen)', textarea('description', d.description, 'maxlength="2000" rows="2"'), 'span2')}
         </div>${datalist('dl-cat', cats)}${datalist('dl-unit', UNITS)}${datalist('dl-loc', locs)}`,
       extra: isNew ? '' : `<button type="button" class="btn danger" data-action="archive-article" data-id="${a.id}">Archivieren</button>
-        <button type="button" class="btn" data-action="inventory" data-id="${a.id}">Inventur</button>`,
+        ${tracksStock(a) ? `<button type="button" class="btn" data-action="inventory" data-id="${a.id}">Inventur</button>` : ''}`,
+      onMount(form) {
+        const typeSel = $('[name=type]', form);
+        const unit = $('[name=unit]', form);
+        const syncType = () => {
+          const svc = typeSel.value === 'service';
+          $$('.only-product', form).forEach((el) => el.classList.toggle('hidden', svc));
+        };
+        typeSel.addEventListener('change', () => {
+          if (typeSel.value === 'service' && unit.value === 'Stk') unit.value = 'Std';
+          if (typeSel.value === 'product' && unit.value === 'Std') unit.value = 'Stk';
+          syncType();
+        });
+        const margin = () => {
+          const vk = num($('[name=vk]', form).value);
+          const ek = num($('[name=ek]', form).value);
+          $('#art-margin', form).value = vk > 0 && ek > 0 ? `${money(vk - ek)} (${(((vk - ek) / vk) * 100).toFixed(1).replace('.', ',')} %)` : '—';
+        };
+        form.addEventListener('input', margin);
+        syncType();
+        margin();
+      },
       onSubmit(fd) {
         const sku = fd.sku.trim();
-        if (all('articles').some((x) => x.sku === sku && x.id !== (a && a.id) && !x.archived)) throw new Error(`Artikelnummer ${sku} ist bereits vergeben.`);
-        const saved = put('articles', {
+        if (all('articles').some((x) => x.sku === sku && x.id !== (a && a.id) && !x.archived)) throw new Error(`Nummer ${sku} ist bereits vergeben.`);
+        const data = {
           ...(a || {}),
-          sku, ean: fd.ean.trim(), name: fd.name.trim(), category: fd.category.trim(), unit: fd.unit.trim(),
-          ek: num(fd.ek), vk: num(fd.vk), tax: num(fd.tax), min: num(fd.min), location: fd.location.trim(), description: fd.description,
-        });
-        if (isNew && num(fd.initial) > 0) {
+          type: fd.type === 'service' ? 'service' : 'product',
+          sku, name: fd.name.trim(), category: fd.category.trim(), unit: fd.unit.trim(),
+          ek: num(fd.ek), vk: num(fd.vk), tax: num(fd.tax), description: fd.description,
+        };
+        if (inv) Object.assign(data, { ean: (fd.ean || '').trim(), min: num(fd.min), location: (fd.location || '').trim() });
+        const saved = put('articles', data);
+        if (isNew && tracksStock(saved) && num(fd.initial) > 0) {
           put('movements', { articleId: saved.id, qty: num(fd.initial), type: 'initial', date: today(), unitCost: saved.ek, note: 'Anfangsbestand' });
         }
-        toast(isNew ? 'Artikel angelegt' : 'Artikel gespeichert', 'ok');
+        toast(isNew ? `${saved.type === 'service' ? 'Leistung' : 'Produkt'} angelegt` : 'Gespeichert', 'ok');
       },
     });
   }
 
   // =============================================================== Ansicht: Lager
-  function articleOptions(selected, { withStock = true, placeholder = 'Artikel wählen …' } = {}) {
-    const st = stockMap();
-    return `<option value="">${esc(placeholder)}</option>${articles().map((a) => `<option value="${a.id}" ${a.id === selected ? 'selected' : ''}>${esc(a.sku)} – ${esc(a.name)}${withStock ? ` (${fmtNum(st[a.id] || 0)} ${esc(a.unit || '')})` : ''}</option>`).join('')}`;
-  }
-
   function viewStock() {
     const st = stockMap();
-    const arts = articles();
+    const arts = stockArticles();
     let mv = all('movements').sort(byDateDesc);
     const total = mv.length;
     if (UI.q.mvArt) mv = mv.filter((m) => m.articleId === UI.q.mvArt);
@@ -1035,14 +1300,14 @@
     const shown = mv.slice(0, 400);
     return `
       <div class="kpis">
-        ${kpi('Lagerwert (EK)', money(sum(arts, (a) => Math.max(0, st[a.id] || 0) * num(a.ek))))}
-        ${kpi('Artikel', fmtNum(arts.length), '', `${fmtNum(sum(arts, (a) => Math.max(0, st[a.id] || 0)))} Einheiten gesamt`)}
-        ${kpi('Unter Mindestbestand', fmtNum(arts.filter((a) => isLow(a, st)).length), arts.some((a) => isLow(a, st)) ? 'neg' : '')}
-        ${kpi('Bewegungen (30 Tage)', fmtNum(all('movements').filter((m) => (m.date || '') >= since30).length), '', `${fmtNum(total)} insgesamt`)}
+        ${kpi('Lagerwert (EK)', money(sum(arts, (a) => Math.max(0, st[a.id] || 0) * num(a.ek))), '', 'zu Einkaufspreisen', 'layers')}
+        ${kpi('Produkte im Lager', fmtNum(arts.length), '', `${fmtNum(sum(arts, (a) => Math.max(0, st[a.id] || 0)))} Einheiten gesamt`, 'tag')}
+        ${kpi('Unter Mindestbestand', fmtNum(arts.filter((a) => isLow(a, st)).length), arts.some((a) => isLow(a, st)) ? 'neg' : '', 'nachbestellen', 'alert')}
+        ${kpi('Bewegungen (30 Tage)', fmtNum(all('movements').filter((m) => (m.date || '') >= since30).length), '', `${fmtNum(total)} insgesamt`, 'sync')}
       </div>
       <div class="toolbar">
         ${searchBox('mv', 'Bewegungen durchsuchen …')}
-        <select id="s-mvArt" data-ui="mvArt">${articleOptions(UI.q.mvArt, { withStock: false, placeholder: 'Alle Artikel' })}</select>
+        <select id="s-mvArt" data-ui="mvArt">${articleOptions(UI.q.mvArt, { withStock: false, placeholder: 'Alle Produkte', productsOnly: true })}</select>
         ${uiSelect('mvType', [['', 'Alle Arten'], ...Object.entries(MV_TYPES)])}
         <div class="actions">
           <button class="btn" data-action="inventory">${icon('clipboard', 16)} Inventur</button>
@@ -1074,13 +1339,13 @@
   }
 
   function openMovement(type, articleId) {
-    if (!articles().length) return toast('Bitte zuerst einen Artikel anlegen.', 'error');
+    if (!stockArticles().length) return toast('Bitte zuerst ein Produkt anlegen.', 'error');
     const isIn = type === 'in';
     const a0 = articleId ? get('articles', articleId) : null;
     openModal({
       title: isIn ? 'Wareneingang buchen' : 'Warenausgang buchen',
       body: `<div class="grid2">
-          ${field('Artikel', `<select name="articleId" required>${articleOptions(articleId)}</select>`, 'span2')}
+          ${field('Artikel', `<select name="articleId" required>${articleOptions(articleId, { productsOnly: true })}</select>`, 'span2')}
           ${field('Menge', numInp('qty', '', 'required min="0.001"'))}
           ${field('Datum', inp('date', today(), 'type="date" required'))}
           ${isIn ? field('Einkaufspreis netto je Einheit (€)', numInp('unitCost', a0 ? a0.ek : '', 'min="0"')) : ''}
@@ -1109,13 +1374,13 @@
   }
 
   function openInventory(articleId) {
-    if (!articles().length) return toast('Bitte zuerst einen Artikel anlegen.', 'error');
+    if (!stockArticles().length) return toast('Bitte zuerst ein Produkt anlegen.', 'error');
     const st = stockMap();
     openModal({
       title: 'Inventur / Bestandskorrektur',
       body: `<p class="muted">Gib den tatsächlich gezählten Bestand ein. NEXCOUNT bucht die Differenz als Inventurkorrektur.</p>
         <div class="grid2">
-          ${field('Artikel', `<select name="articleId" required>${articleOptions(articleId)}</select>`, 'span2')}
+          ${field('Artikel', `<select name="articleId" required>${articleOptions(articleId, { productsOnly: true })}</select>`, 'span2')}
           ${field('Buchbestand', '<input id="inv-current" readonly>')}
           ${field('Gezählter Bestand', numInp('counted', '', 'required min="0"'))}
           ${field('Datum', inp('date', today(), 'type="date" required'))}
@@ -1150,42 +1415,57 @@
     render();
   }
 
-  // =============================================================== Ansicht: Belege
+  // =============================================================== Ansicht: Belege (Rechnungen, Angebote, Einkäufe)
+  function docBadge(d) {
+    if (isLate(d)) return `<span class="badge overdue">${d.kind === 'quote' ? 'Abgelaufen' : 'Überfällig'}</span>`;
+    return `<span class="badge ${d.status}">${esc(statusLabel(d))}</span>`;
+  }
+
   function viewDocuments() {
-    const kind = UI.q.docKind === 'purchase' ? 'purchase' : 'sale';
-    const isSale = kind === 'sale';
+    const kinds = docKindsOn();
+    const kind = kinds.includes(UI.q.docKind) ? UI.q.docKind : kinds[0];
+    const K = DOC_KINDS[kind];
+    const customer = K.contact === 'customer';
     let docs = all('documents').filter((d) => d.kind === kind).sort((a, b) => byDateDesc(a, b) || String(b.number).localeCompare(String(a.number)));
+    const allKind = docs;
     const stat = UI.q.docStatus || '';
-    if (stat === 'overdue') docs = docs.filter((d) => d.status === 'open' && d.dueDate && d.dueDate < today());
+    if (stat === 'late') docs = docs.filter(isLate);
     else if (stat) docs = docs.filter((d) => d.status === stat);
     const q = (UI.q.doc || '').toLowerCase();
     if (q) docs = docs.filter((d) => [d.number, d.contact && d.contact.name, d.reference, ...(d.items || []).map((i) => i.text)].join(' ').toLowerCase().includes(q));
-    const allKind = all('documents').filter((d) => d.kind === kind);
+    const statusOpts = {
+      sale: [['draft', 'Entwurf'], ['open', 'Offen'], ['late', 'Überfällig'], ['paid', 'Bezahlt'], ['cancelled', 'Storniert']],
+      quote: [['draft', 'Entwurf'], ['open', 'Versendet'], ['late', 'Abgelaufen'], ['accepted', 'Angenommen'], ['rejected', 'Abgelehnt']],
+      purchase: [['draft', 'Entwurf'], ['open', 'Offen'], ['paid', 'Bezahlt'], ['cancelled', 'Storniert']],
+    }[kind];
     const openSum = sum(allKind.filter((d) => d.status === 'open'), (d) => docTotals(d).gross);
+    const dueHead = kind === 'sale' ? 'Fällig' : kind === 'quote' ? 'Gültig bis' : '';
     return `
+      ${kinds.length > 1 ? `<div class="seg tabs-seg">${kinds.map((k) => `<button data-action="set-ui" data-k="docKind" data-v="${k}" class="${k === kind ? 'active' : ''}">${icon(DOC_KINDS[k].icon, 16)} ${DOC_KINDS[k].plural}</button>`).join('')}</div>` : ''}
       <div class="toolbar">
-        <div class="seg"><button data-action="set-ui" data-k="docKind" data-v="sale" class="${isSale ? 'active' : ''}">Ausgangsrechnungen</button><button data-action="set-ui" data-k="docKind" data-v="purchase" class="${isSale ? '' : 'active'}">Einkäufe</button></div>
         ${searchBox('doc', 'Nummer, Kontakt, Position …')}
-        ${uiSelect('docStatus', [['', 'Alle Status'], ...Object.entries(DOC_STATUS), ...(isSale ? [['overdue', 'Überfällig']] : [])])}
-        <div class="actions"><button class="btn primary" data-action="new-doc" data-kind="${kind}">${icon('plus', 16)} ${isSale ? 'Rechnung' : 'Einkauf'}</button></div>
+        ${uiSelect('docStatus', [['', 'Alle Status'], ...statusOpts])}
+        <div class="actions"><button class="btn primary" data-action="new-doc" data-kind="${kind}">${icon('plus', 16)} ${K.label}</button></div>
       </div>
       <section class="card flush">
         ${docs.length ? `<div class="table-wrap"><table>
-          <thead><tr><th>Nummer</th><th>Datum</th><th>${isSale ? 'Kunde' : 'Lieferant'}</th><th>Status</th>${isSale ? '<th>Fällig</th>' : ''}<th class="num">Netto</th><th class="num">Brutto</th></tr></thead>
+          <thead><tr><th>Nummer</th><th>Datum</th><th>${customer ? 'Kunde' : 'Lieferant'}</th><th>Status</th>${dueHead ? `<th>${dueHead}</th>` : ''}<th class="num">Netto</th><th class="num">Brutto</th></tr></thead>
           <tbody>${docs.map((d) => {
             const t = docTotals(d);
-            const od = d.status === 'open' && d.dueDate && d.dueDate < today();
+            const dueCell = kind === 'sale' && d.status === 'paid' ? `<span class="muted">bezahlt ${fmtDate(d.paidAt)}</span>` : fmtDate(d.dueDate);
             return `<tr class="clickable" data-action="open-doc" data-id="${d.id}">
               <td><b>${esc(d.number || 'Entwurf')}</b>${d.reference ? `<span class="sub">${esc(d.reference)}</span>` : ''}</td>
               <td>${fmtDate(d.date)}</td>
               <td>${esc((d.contact && d.contact.name) || '—')}</td>
-              <td><span class="badge ${od ? 'overdue' : d.status}">${od ? 'Überfällig' : DOC_STATUS[d.status]}</span></td>
-              ${isSale ? `<td>${d.status === 'paid' ? `<span class="muted">bezahlt ${fmtDate(d.paidAt)}</span>` : fmtDate(d.dueDate)}</td>` : ''}
+              <td>${docBadge(d)}</td>
+              ${dueHead ? `<td>${dueCell}</td>` : ''}
               <td class="num">${money(t.net)}</td>
               <td class="num"><b>${money(t.gross)}</b></td></tr>`;
           }).join('')}</tbody>
-          <tfoot><tr><td colspan="${isSale ? 5 : 4}">${docs.length} Beleg(e) · offen gesamt ${money(openSum)}</td><td class="num">${money(sum(docs, (d) => docTotals(d).net))}</td><td class="num">${money(sum(docs, (d) => docTotals(d).gross))}</td></tr></tfoot>
-        </table></div>` : empty('file', allKind.length ? 'Keine Belege für diesen Filter.' : isSale ? 'Noch keine Rechnungen geschrieben.' : 'Noch keine Einkäufe erfasst.', allKind.length ? '' : `<button class="btn primary" data-action="new-doc" data-kind="${kind}">${icon('plus', 16)} ${isSale ? 'Erste Rechnung' : 'Ersten Einkauf'} erstellen</button>`)}
+          <tfoot><tr><td colspan="${dueHead ? 5 : 4}">${docs.length} ${docs.length === 1 ? K.label : K.plural} · offen gesamt ${money(openSum)}</td><td class="num">${money(sum(docs, (d) => docTotals(d).net))}</td><td class="num">${money(sum(docs, (d) => docTotals(d).gross))}</td></tr></tfoot>
+        </table></div>`
+        : empty(K.icon, allKind.length ? 'Nichts gefunden für diesen Filter.' : { sale: 'Noch keine Rechnungen geschrieben.', quote: 'Noch keine Angebote erstellt.', purchase: 'Noch keine Einkäufe erfasst.' }[kind],
+          allKind.length ? '' : `<button class="btn primary" data-action="new-doc" data-kind="${kind}">${icon('plus', 16)} ${K.label} erstellen</button>`)}
       </section>`;
   }
 
@@ -1197,50 +1477,64 @@
     </div>`;
   }
 
-  function openDoc(id, kind = 'sale') {
+  function openDoc(id, kindArg = 'sale') {
     const existing = id ? get('documents', id) : null;
     if (id && !existing) return toast('Beleg nicht gefunden.', 'error');
     if (existing && existing.status !== 'draft') return openDocView(existing);
     const s = settings();
     const smallBiz = !!s.smallBusiness;
+    const kind = existing ? existing.kind : (DOC_KINDS[kindArg] ? kindArg : 'sale');
+    const K = DOC_KINDS[kind];
+    const customer = K.contact === 'customer';
+    const isQuote = kind === 'quote';
+    const days = isQuote ? num(s.quoteDays) || 30 : num(s.paymentDays) || 14;
     const doc = existing ? JSON.parse(JSON.stringify(existing)) : {
       id: uid(), kind, status: 'draft', date: today(),
-      dueDate: kind === 'sale' ? addDays(today(), num(s.paymentDays) || 14) : '', items: [], contactId: '', reference: '', notes: '',
+      dueDate: kind === 'purchase' ? '' : addDays(today(), days), items: [], contactId: '', reference: '', notes: '',
     };
-    const isSale = doc.kind === 'sale';
+    const useCatalog = mod('catalog') && articles().length > 0;
     const newItem = () => ({ articleId: '', text: '', qty: 1, price: '', tax: smallBiz ? 0 : 19 });
     if (!doc.items.length) doc.items.push(newItem());
-    const contacts = all('contacts').filter((c) => c.type === 'both' || c.type === (isSale ? 'customer' : 'supplier')).sort(byName);
+    const contacts = all('contacts').filter((c) => c.type === 'both' || c.type === K.contact).sort(byName);
 
     const row = (it, i) => `<tr data-i="${i}">
-      <td class="c-art"><select data-f="articleId">${articleOptions(it.articleId, { placeholder: '— Freitext —' })}</select></td>
-      <td><input data-f="text" value="${esc(it.text)}" placeholder="Beschreibung" maxlength="300"></td>
-      <td class="c-qty"><input data-f="qty" type="number" step="any" class="num" value="${esc(it.qty)}"></td>
-      <td class="c-price"><input data-f="price" type="number" step="any" class="num" value="${esc(it.price)}" placeholder="0,00"></td>
-      <td class="c-tax"><select data-f="tax">${RATES.map(([v, l]) => `<option value="${v}" ${num(it.tax) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
+      ${useCatalog ? `<td class="c-art"><select data-f="articleId" aria-label="Artikel">${articleOptions(it.articleId, { placeholder: '— Freitext —' })}</select></td>` : ''}
+      <td><input data-f="text" value="${esc(it.text)}" placeholder="Beschreibung" maxlength="300" aria-label="Beschreibung"></td>
+      <td class="c-qty"><input data-f="qty" type="number" step="any" class="num" value="${esc(it.qty)}" aria-label="Menge"></td>
+      <td class="c-price"><input data-f="price" type="number" step="any" class="num" value="${esc(it.price)}" placeholder="0,00" aria-label="Preis"></td>
+      <td class="c-tax"><select data-f="tax" aria-label="USt">${RATES.map(([v, l]) => `<option value="${v}" ${num(it.tax) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td>
       <td class="c-total num" data-total>${money(num(it.qty) * num(it.price))}</td>
       <td><button type="button" class="icon-btn" data-rm title="Position entfernen">${icon('x', 16)}</button></td>
     </tr>`;
 
-    const form = openModal({
-      title: existing ? `${isSale ? 'Rechnung' : 'Einkauf'} bearbeiten (Entwurf)` : isSale ? 'Neue Rechnung' : 'Neuer Einkauf',
+    const labels = {
+      sale: { date: 'Rechnungsdatum', due: 'Fällig am', ref: 'Referenz / Bestellnr. des Kunden', notes: 'Hinweis auf der Rechnung' },
+      quote: { date: 'Angebotsdatum', due: 'Gültig bis', ref: 'Betreff / Projekt', notes: 'Text auf dem Angebot' },
+      purchase: { date: 'Belegdatum', due: '', ref: 'Rechnungsnr. des Lieferanten', notes: 'Notiz' },
+    }[kind];
+    const hint = isQuote
+      ? 'Mit <b>Fertigstellen</b> erhält das Angebot eine Nummer und kann gedruckt werden. Nimmt der Kunde an, wandelst du es mit einem Klick in eine Rechnung um.'
+      : `Beim <b>Festschreiben</b> erhält der Beleg eine fortlaufende Nummer${mod('inventory') ? (kind === 'sale' ? ' und Produkte werden aus dem Lager gebucht' : ' und Produkte werden ins Lager eingebucht') : ''}. Danach sind nur noch Zahlung oder Storno möglich.`;
+
+    openModal({
+      title: existing ? `${K.label} bearbeiten (Entwurf)` : `Neue${kind === 'sale' ? '' : 's'} ${K.label}`.replace('Neues Rechnung', 'Neue Rechnung').replace('Neues Einkauf', 'Neuer Einkauf'),
       wide: true,
       body: `<div class="grid3">
-          ${field(isSale ? 'Kunde' : 'Lieferant', `<select name="contactId" ${isSale ? 'required' : ''}><option value="">${isSale ? 'Kunde wählen …' : '— ohne Lieferant —'}</option>${contacts.map((c) => `<option value="${c.id}" ${c.id === doc.contactId ? 'selected' : ''}>${esc(c.name)}${c.number ? ` (${esc(c.number)})` : ''}</option>`).join('')}</select>`)}
-          ${field(isSale ? 'Rechnungsdatum' : 'Belegdatum', inp('date', doc.date, 'type="date" required'))}
-          ${isSale ? field('Fällig am', inp('dueDate', doc.dueDate, 'type="date"')) : field('Lieferanten-Rechnungsnr.', inp('reference', doc.reference, 'maxlength="60"'))}
-          ${isSale ? field('Referenz / Bestellnr. des Kunden', inp('reference', doc.reference, 'maxlength="60"')) : ''}
+          ${field(customer ? 'Kunde' : 'Lieferant', `<select name="contactId" ${customer ? 'required' : ''}><option value="">${customer ? 'Kunde wählen …' : '— ohne Lieferant —'}</option>${contacts.map((c) => `<option value="${c.id}" ${c.id === doc.contactId ? 'selected' : ''}>${esc(c.name)}${c.number ? ` (${esc(c.number)})` : ''}</option>`).join('')}</select>`)}
+          ${field(labels.date, inp('date', doc.date, 'type="date" required'))}
+          ${labels.due ? field(labels.due, inp('dueDate', doc.dueDate, 'type="date"')) : field(labels.ref, inp('reference', doc.reference, 'maxlength="60"'))}
+          ${labels.due ? field(labels.ref, inp('reference', doc.reference, 'maxlength="80"')) : ''}
         </div>
-        ${!contacts.length ? `<div class="alert info">Noch keine ${isSale ? 'Kunden' : 'Lieferanten'} vorhanden – lege sie unter <a href="#/contacts">Kontakte</a> an.</div>` : ''}
+        ${!contacts.length && customer ? '<div class="alert info">Noch keine Kunden vorhanden – lege sie zuerst unter <a href="#/contacts">Kontakte</a> an.</div>' : ''}
         <div class="table-wrap"><table class="items-table">
-          <thead><tr><th>Artikel</th><th>Beschreibung</th><th class="num">Menge</th><th class="num">${isSale ? 'Preis' : 'EK'} netto</th><th>USt</th><th class="num">Summe</th><th></th></tr></thead>
+          <thead><tr>${useCatalog ? `<th>${mod('inventory') ? 'Artikel' : 'Produkt / Leistung'}</th>` : ''}<th>Beschreibung</th><th class="num">Menge</th><th class="num">${kind === 'purchase' ? 'EK' : 'Preis'} netto</th><th>USt</th><th class="num">Summe</th><th></th></tr></thead>
           <tbody id="doc-items"></tbody>
         </table></div>
         <div class="toolbar"><button type="button" class="btn sm" id="add-item">${icon('plus', 14)} Position</button><span class="spacer"></span><div id="doc-totals" style="flex:1"></div></div>
-        ${field(isSale ? 'Hinweis auf der Rechnung' : 'Notiz', textarea('notes', doc.notes, 'maxlength="2000" rows="2"'))}
-        <p class="muted small">Beim <b>Festschreiben</b> erhält der Beleg eine fortlaufende Nummer und ${isSale ? 'Artikel werden aus dem Lager gebucht' : 'Artikel werden ins Lager eingebucht'}. Danach sind nur noch Zahlung oder Storno möglich.</p>`,
+        ${field(labels.notes, textarea('notes', doc.notes, 'maxlength="2000" rows="2"'))}
+        <p class="muted small">${hint}</p>`,
       submit: 'Entwurf speichern',
-      extra: `${existing ? '<button type="button" class="btn danger" id="doc-delete">Entwurf löschen</button>' : ''}<button type="button" class="btn" id="doc-finalize">${icon('check', 16)} Festschreiben</button>`,
+      extra: `${existing ? '<button type="button" class="btn danger" id="doc-delete">Entwurf löschen</button>' : ''}<button type="button" class="btn" id="doc-finalize">${icon('check', 16)} ${isQuote ? 'Fertigstellen' : 'Festschreiben'}</button>`,
       onMount(f) {
         const tbody = $('#doc-items', f);
         const drawTotals = () => { $('#doc-totals', f).innerHTML = totalsHtml(calcTotals(doc.items)); };
@@ -1256,7 +1550,7 @@
             const a = get('articles', it.articleId);
             if (a) {
               it.text = a.name;
-              it.price = isSale ? num(a.vk) : num(a.ek);
+              it.price = kind === 'purchase' ? num(a.ek) : num(a.vk);
               it.tax = smallBiz ? 0 : num(a.tax);
               it.unit = a.unit;
             }
@@ -1278,12 +1572,14 @@
           if (!f.reportValidity()) return;
           try {
             const d = collect(f);
-            if (!d.items.length) throw new Error('Bitte mindestens eine Position mit Beschreibung oder Artikel erfassen.');
-            if (!confirm(`${isSale ? 'Rechnung' : 'Einkauf'} über ${money(calcTotals(d.items).gross)} festschreiben? Die Lagerbestände werden gebucht.`)) return;
+            if (!d.items.length) throw new Error('Bitte mindestens eine Position mit Beschreibung erfassen.');
+            const msg = isQuote ? `Angebot über ${money(calcTotals(d.items).gross)} fertigstellen?`
+              : `${K.label} über ${money(calcTotals(d.items).gross)} festschreiben?${mod('inventory') ? ' Die Lagerbestände werden gebucht.' : ''}`;
+            if (!confirm(msg)) return;
             const saved = finalizeDoc(d);
             closeModal();
             render();
-            toast(`${saved.number} festgeschrieben`, 'ok');
+            toast(`${saved.number} ${isQuote ? 'fertiggestellt' : 'festgeschrieben'}`, 'ok');
             openDocView(saved);
           } catch (err) { toast(err.message, 'error'); }
         });
@@ -1305,14 +1601,14 @@
     // liest Formular + Positionen in eine neue Belegkopie (Editor-Zustand bleibt unverändert)
     function collect(f) {
       const fd = Object.fromEntries(new FormData(f));
-      if (isSale && !fd.contactId) throw new Error('Bitte einen Kunden wählen.');
+      if (customer && !fd.contactId) throw new Error('Bitte einen Kunden wählen.');
       const c = get('contacts', fd.contactId);
       return {
         ...doc,
         contactId: fd.contactId || '',
         contact: c ? { name: c.name, contactPerson: c.contactPerson, street: c.street, zip: c.zip, city: c.city, country: c.country, vatId: c.vatId, number: c.number } : null,
         date: fd.date,
-        dueDate: isSale ? fd.dueDate : '',
+        dueDate: kind === 'purchase' ? '' : fd.dueDate,
         reference: (fd.reference || '').trim(),
         notes: fd.notes || '',
         items: doc.items
@@ -1320,23 +1616,36 @@
           .map((it) => ({ articleId: it.articleId || '', text: String(it.text || '').trim(), qty: num(it.qty), price: num(it.price), tax: num(it.tax), unit: it.unit || (articleRaw(it.articleId) || {}).unit || '' })),
       };
     }
-    return form;
   }
 
   function openDocView(doc) {
-    const isSale = doc.kind === 'sale';
+    const K = DOC_KINDS[doc.kind] || DOC_KINDS.sale;
+    const customer = K.contact === 'customer';
     const t = calcTotals(doc.items);
-    const od = doc.status === 'open' && doc.dueDate && doc.dueDate < today();
+    const late = isLate(doc);
+    const linked = doc.invoiceId ? get('documents', doc.invoiceId) : null;
+    const btn = (id, ic, label, cls = '') => `<button type="button" class="btn ${cls}" id="${id}">${icon(ic, 16)} ${label}</button>`;
+    let actions = btn('dv-print', 'print', 'Drucken / PDF') + btn('dv-copy', 'copy', 'Kopie');
+    if (doc.kind === 'sale' && late) actions += btn('dv-remind', 'bell', 'Zahlungserinnerung');
+    if (doc.kind === 'quote') {
+      if (doc.status === 'open') actions += btn('dv-reject', 'x', 'Abgelehnt', 'danger');
+      if (doc.status === 'open' && mod('invoices')) actions += btn('dv-convert', 'file', 'In Rechnung umwandeln', 'primary');
+      if (linked) actions += btn('dv-linked', 'file', `Rechnung ${esc(linked.number || '(Entwurf)')} öffnen`);
+    } else {
+      if (doc.status === 'open' || doc.status === 'paid') actions += btn('dv-cancel', 'undo', 'Stornieren', 'danger');
+      if (doc.status === 'open') actions += btn('dv-paid', 'check', 'Als bezahlt markieren', 'primary');
+    }
     openModal({
-      title: `${isSale ? 'Rechnung' : 'Einkauf'} ${doc.number}`,
+      title: `${K.label} ${doc.number}`,
       wide: true,
       body: `<div class="meta">
-          <div><span>Status</span><b><span class="badge ${od ? 'overdue' : doc.status}">${od ? 'Überfällig' : DOC_STATUS[doc.status]}</span></b></div>
-          <div><span>${isSale ? 'Kunde' : 'Lieferant'}</span><b>${esc((doc.contact && doc.contact.name) || '—')}</b></div>
+          <div><span>Status</span><b>${docBadge(doc)}</b></div>
+          <div><span>${customer ? 'Kunde' : 'Lieferant'}</span><b>${esc((doc.contact && doc.contact.name) || '—')}</b></div>
           <div><span>Datum</span><b>${fmtDate(doc.date)}</b></div>
-          ${isSale ? `<div><span>Fällig</span><b>${fmtDate(doc.dueDate) || '—'}</b></div>` : ''}
+          ${doc.kind !== 'purchase' ? `<div><span>${doc.kind === 'quote' ? 'Gültig bis' : 'Fällig'}</span><b>${fmtDate(doc.dueDate) || '—'}</b></div>` : ''}
           ${doc.reference ? `<div><span>Referenz</span><b>${esc(doc.reference)}</b></div>` : ''}
           ${doc.paidAt ? `<div><span>Bezahlt am</span><b>${fmtDate(doc.paidAt)}</b></div>` : ''}
+          ${doc.fromQuoteNumber ? `<div><span>Aus Angebot</span><b>${esc(doc.fromQuoteNumber)}</b></div>` : ''}
         </div>
         <div class="table-wrap"><table>
           <thead><tr><th>Pos.</th><th>Beschreibung</th><th class="num">Menge</th><th class="num">Einzelpreis</th><th class="num">USt</th><th class="num">Summe netto</th></tr></thead>
@@ -1344,32 +1653,45 @@
         </table></div>
         ${totalsHtml(t)}
         ${doc.notes ? `<div class="alert info">${esc(doc.notes)}</div>` : ''}`,
-      extra: `<button type="button" class="btn" id="dv-print">${icon('print', 16)} Drucken / PDF</button>
-        <button type="button" class="btn" id="dv-copy">${icon('copy', 16)} Kopie</button>
-        ${doc.status === 'open' || doc.status === 'paid' ? '<button type="button" class="btn danger" id="dv-cancel">Stornieren</button>' : ''}
-        ${doc.status === 'open' ? `<button type="button" class="btn primary" id="dv-paid">${icon('check', 16)} Als bezahlt markieren</button>` : ''}`,
+      extra: actions,
       onMount(f) {
-        $('#dv-print', f).addEventListener('click', () => printDoc(doc));
-        $('#dv-copy', f).addEventListener('click', () => {
-          const copy = { kind: doc.kind, status: 'draft', date: today(), dueDate: doc.kind === 'sale' ? addDays(today(), num(settings().paymentDays) || 14) : '', contactId: doc.contactId, contact: doc.contact, items: JSON.parse(JSON.stringify(doc.items)), notes: doc.notes, reference: '' };
-          const saved = put('documents', copy);
+        const on = (id, fn) => { const el = $(`#${id}`, f); if (el) el.addEventListener('click', fn); };
+        on('dv-print', () => printDoc(doc));
+        on('dv-remind', () => printDoc(doc, { reminder: true }));
+        on('dv-copy', () => {
+          const s = settings();
+          const days = doc.kind === 'quote' ? num(s.quoteDays) || 30 : num(s.paymentDays) || 14;
+          const saved = put('documents', { kind: doc.kind, status: 'draft', date: today(), dueDate: doc.kind === 'purchase' ? '' : addDays(today(), days), contactId: doc.contactId, contact: doc.contact, items: JSON.parse(JSON.stringify(doc.items)), notes: doc.notes, reference: '' });
           closeModal();
           render();
           openDoc(saved.id);
         });
-        const c = $('#dv-cancel', f);
-        if (c) c.addEventListener('click', () => {
-          if (!confirm(`${doc.number} stornieren? Lagerbewegungen werden zurückgebucht${doc.status === 'paid' ? ' und die Zahlungsbuchung entfernt' : ''}.`)) return;
+        on('dv-convert', () => {
+          const inv = convertQuote(doc);
+          closeModal();
+          render();
+          toast(`Rechnungsentwurf aus ${doc.number} erstellt`, 'ok');
+          openDoc(inv.id);
+        });
+        on('dv-linked', () => { closeModal(); openDoc(linked.id); });
+        on('dv-reject', () => {
+          if (!confirm(`${doc.number} als abgelehnt markieren?`)) return;
+          put('documents', { ...doc, status: 'rejected', rejectedAt: today() });
+          closeModal();
+          render();
+          toast(`${doc.number} als abgelehnt markiert`);
+        });
+        on('dv-cancel', () => {
+          if (!confirm(`${doc.number} stornieren?${(doc.movementIds || []).length ? ' Lagerbewegungen werden zurückgebucht.' : ''}${doc.status === 'paid' ? ' Die Zahlungsbuchung wird entfernt.' : ''}`)) return;
           cancelDoc(doc);
           closeModal();
           render();
           toast(`${doc.number} storniert`, 'ok');
         });
-        const p = $('#dv-paid', f);
-        if (p) p.addEventListener('click', () => {
+        on('dv-paid', () => {
           openModal({
             title: `Zahlung erfassen · ${doc.number}`,
-            body: `<p>Betrag: <b>${money(t.gross)}</b> – es wird automatisch eine ${isSale ? 'Einnahme' : 'Ausgabe'} im Kassenbuch erstellt.</p>
+            body: `<p>Betrag: <b>${money(t.gross)}</b> – es wird automatisch eine ${doc.kind === 'sale' ? 'Einnahme' : 'Ausgabe'} im Kassenbuch erstellt.</p>
               <div class="grid2">${field('Zahlungsdatum', inp('date', today(), 'type="date" required'))}${field('Zahlungsart', selectEl('method', METHODS.map((m) => [m, m]), 'Bank'))}</div>`,
             submit: 'Zahlung buchen',
             onSubmit(fd) {
@@ -1382,12 +1704,27 @@
     });
   }
 
-  function printDoc(doc) {
+  function printDoc(doc, { reminder = false } = {}) {
     const s = settings();
     const t = calcTotals(doc.items);
     const c = doc.contact || {};
-    const isSale = doc.kind === 'sale';
-    const sender = [s.name || companyName(), s.street, [s.zip, s.city].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+    const customer = doc.kind !== 'purchase';
+    const title = reminder ? 'Zahlungserinnerung' : { sale: 'Rechnung', quote: 'Angebot', purchase: 'Einkaufsbeleg' }[doc.kind] || 'Beleg';
+    const firm = s.name || companyName();
+    const sender = [firm, s.street, [s.zip, s.city].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+    const dateLabel = { sale: 'Rechnungsdatum', quote: 'Angebotsdatum', purchase: 'Belegdatum' }[doc.kind];
+    const meta = reminder
+      ? [`Datum: ${fmtDate(today())}`, `Rechnung ${esc(doc.number)} vom ${fmtDate(doc.date)}`, `fällig seit ${fmtDate(doc.dueDate)}`]
+      : [`${dateLabel}: ${fmtDate(doc.date)}`,
+        doc.kind === 'sale' && doc.dueDate ? `Zahlbar bis: ${fmtDate(doc.dueDate)}` : '',
+        doc.kind === 'quote' && doc.dueDate ? `Gültig bis: ${fmtDate(doc.dueDate)}` : '',
+        doc.reference ? `${doc.kind === 'quote' ? 'Betreff' : 'Referenz'}: ${esc(doc.reference)}` : ''];
+    if (c.number) meta.push(`Kunden-Nr.: ${esc(c.number)}`);
+    if (c.vatId) meta.push(`USt-IdNr. Kunde: ${esc(c.vatId)}`);
+    const reminderText = reminder ? `<p style="margin-top:18px">Sehr geehrte Damen und Herren,</p>
+      <p>sicher ist es Ihrer Aufmerksamkeit entgangen: Unsere Rechnung <b>${esc(doc.number)}</b> vom ${fmtDate(doc.date)} über <b>${money(t.gross)}</b> war am ${fmtDate(doc.dueDate)} fällig.
+      Bitte überweisen Sie den offenen Betrag bis zum <b>${fmtDate(addDays(today(), 7))}</b>. Sollten Sie bereits bezahlt haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.</p>` : '';
+    const footerText = reminder ? '' : doc.kind === 'quote' ? (s.quoteFooter || 'Wir freuen uns auf Ihren Auftrag.') : doc.kind === 'sale' ? (s.invoiceFooter || '') : '';
     $('#print-root').innerHTML = `<div class="print-doc">
       <div class="p-head">
         <div>
@@ -1399,21 +1736,22 @@
           ${c.country && c.country !== 'Deutschland' ? `<div>${esc(c.country)}</div>` : ''}
         </div>
         <div style="text-align:right">
-          <div style="font-size:18px;font-weight:800;letter-spacing:.04em">${esc(s.name || companyName())}</div>
+          <div class="p-firm">${esc(firm)}</div>
           <div>${esc(s.street || '')}</div><div>${esc([s.zip, s.city].filter(Boolean).join(' '))}</div>
           ${s.phone ? `<div>Tel. ${esc(s.phone)}</div>` : ''}${s.email ? `<div>${esc(s.email)}</div>` : ''}${s.website ? `<div>${esc(s.website)}</div>` : ''}
         </div>
       </div>
-      <h1>${isSale ? 'Rechnung' : 'Einkaufsbeleg'} ${esc(doc.number)}</h1>
-      <div>${isSale ? 'Rechnungsdatum' : 'Belegdatum'}: ${fmtDate(doc.date)}${isSale && doc.dueDate ? ` · Zahlbar bis: ${fmtDate(doc.dueDate)}` : ''}${doc.reference ? ` · Referenz: ${esc(doc.reference)}` : ''}${c.number ? ` · Kunden-Nr.: ${esc(c.number)}` : ''}${c.vatId ? ` · USt-IdNr. Kunde: ${esc(c.vatId)}` : ''}</div>
+      <h1>${title}${reminder ? '' : ` ${esc(doc.number)}`}</h1>
+      <div class="p-meta">${meta.filter(Boolean).join(' · ')}</div>
+      ${reminderText}
       <table><thead><tr><th>Pos.</th><th>Beschreibung</th><th class="num">Menge</th><th class="num">Einzelpreis</th><th class="num">USt</th><th class="num">Gesamt</th></tr></thead>
         <tbody>${doc.items.map((it, i) => `<tr><td>${i + 1}</td><td>${esc(it.text)}</td><td class="num">${fmtNum(it.qty)} ${esc(it.unit || '')}</td><td class="num">${money(it.price)}</td><td class="num">${num(it.tax)} %</td><td class="num">${money(num(it.qty) * num(it.price))}</td></tr>`).join('')}</tbody></table>
       ${totalsHtml(t)}
-      ${s.smallBusiness && isSale ? '<p style="margin-top:16px">Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.</p>' : ''}
-      ${doc.notes ? `<p style="margin-top:16px;white-space:pre-wrap">${esc(doc.notes)}</p>` : ''}
-      ${isSale && s.invoiceFooter ? `<p style="margin-top:16px;white-space:pre-wrap">${esc(s.invoiceFooter)}</p>` : ''}
+      ${s.smallBusiness && customer ? '<p style="margin-top:16px">Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.</p>' : ''}
+      ${doc.notes && !reminder ? `<p style="margin-top:16px;white-space:pre-wrap">${esc(doc.notes)}</p>` : ''}
+      ${footerText ? `<p style="margin-top:16px;white-space:pre-wrap">${esc(footerText)}</p>` : ''}
       <div class="p-foot">
-        <div><b>${esc(s.name || companyName())}</b><br>${esc(s.street || '')}<br>${esc([s.zip, s.city].filter(Boolean).join(' '))}</div>
+        <div><b>${esc(firm)}</b><br>${esc(s.street || '')}<br>${esc([s.zip, s.city].filter(Boolean).join(' '))}</div>
         <div>${s.taxNumber ? `Steuernummer: ${esc(s.taxNumber)}<br>` : ''}${s.vatId ? `USt-IdNr.: ${esc(s.vatId)}<br>` : ''}${s.owner ? `Inhaber/GF: ${esc(s.owner)}` : ''}</div>
         <div>${s.bank ? `${esc(s.bank)}<br>` : ''}${s.iban ? `IBAN: ${esc(s.iban)}<br>` : ''}${s.bic ? `BIC: ${esc(s.bic)}` : ''}</div>
       </div>
@@ -1540,7 +1878,7 @@
     if (UI.q.cType) list = list.filter((c) => c.type === UI.q.cType || c.type === 'both');
     const q = (UI.q.c || '').toLowerCase();
     if (q) list = list.filter((c) => [c.name, c.number, c.contactPerson, c.email, c.phone, c.city].join(' ').toLowerCase().includes(q));
-    const docs = all('documents').filter((d) => d.status === 'open' || d.status === 'paid');
+    const docs = all('documents').filter((d) => d.kind !== 'quote' && (d.status === 'open' || d.status === 'paid'));
     const volume = {};
     for (const d of docs) volume[d.contactId] = (volume[d.contactId] || 0) + docTotals(d).net;
     return `
@@ -1682,27 +2020,27 @@
             <tr><td>Vorsteuer aus Ausgaben</td><td class="num">${money(expNet)}</td><td class="num">−${money(vst)}</td></tr>
           </tbody><tfoot><tr><td>Zahllast / Erstattung</td><td></td><td class="num">${money(ust - vst)}</td></tr></tfoot></table>
         </section>
-        <section class="card"><div class="card-head"><h3>Offene Posten</h3><span class="muted">aktuell</span></div>
+        ${mod('invoices') || mod('purchases') ? `<section class="card"><div class="card-head"><h3>Offene Posten</h3><span class="muted">aktuell</span></div>
           <table><tbody>
-            <tr><td>Forderungen (Ausgangsrechnungen)</td><td class="num">${openSale.length}</td><td class="num">${money(sum(openSale, (d) => docTotals(d).gross))}</td></tr>
-            <tr><td>davon überfällig</td><td class="num">${openSale.filter((d) => d.dueDate && d.dueDate < today()).length}</td><td class="num neg">${money(sum(openSale.filter((d) => d.dueDate && d.dueDate < today()), (d) => docTotals(d).gross))}</td></tr>
-            <tr><td>Verbindlichkeiten (Einkäufe)</td><td class="num">${openPurch.length}</td><td class="num">${money(sum(openPurch, (d) => docTotals(d).gross))}</td></tr>
+            ${mod('invoices') ? `<tr><td>Forderungen (Rechnungen)</td><td class="num">${openSale.length}</td><td class="num">${money(sum(openSale, (d) => docTotals(d).gross))}</td></tr>
+            <tr><td>davon überfällig</td><td class="num">${openSale.filter(isLate).length}</td><td class="num neg">${money(sum(openSale.filter(isLate), (d) => docTotals(d).gross))}</td></tr>` : ''}
+            ${mod('purchases') ? `<tr><td>Verbindlichkeiten (Einkäufe)</td><td class="num">${openPurch.length}</td><td class="num">${money(sum(openPurch, (d) => docTotals(d).gross))}</td></tr>` : ''}
           </tbody></table>
-        </section>
+        </section>` : ''}
       </div>
-      <div class="grid-2">
+      ${mod('inventory') ? `<div class="grid-2">
         <section class="card"><div class="card-head"><h3>Lagerwert nach Kategorie</h3><span class="muted">zu Einkaufspreisen</span></div>${catTable(Object.entries(stockCats).sort((a, b) => b[1] - a[1]), stockTotal)}</section>
         <section class="card"><div class="card-head"><h3>Wertvollste Lagerposten</h3></div>
           ${top.length ? `<table><tbody>${top.map(({ a, v }) => `<tr><td><b>${esc(a.name)}</b><span class="sub">${esc(a.sku)} · ${fmtNum(st[a.id] || 0)} ${esc(a.unit || '')}</span></td><td class="num">${money(v)}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Keine Artikel.</p>'}
         </section>
-      </div>
+      </div>` : ''}
       <section class="card"><div class="card-head"><h3>Datenexport</h3><span class="muted">CSV im Excel-Format (Semikolon, UTF-8)</span></div>
         <div class="toolbar">
           <button class="btn" data-action="export" data-what="entries">${icon('download', 16)} Buchungen (Zeitraum)</button>
-          <button class="btn" data-action="export" data-what="articles">${icon('download', 16)} Artikel & Bestände</button>
-          <button class="btn" data-action="export" data-what="movements">${icon('download', 16)} Lagerbewegungen</button>
-          <button class="btn" data-action="export" data-what="documents">${icon('download', 16)} Belege</button>
-          <button class="btn" data-action="export" data-what="contacts">${icon('download', 16)} Kontakte</button>
+          ${mod('catalog') ? `<button class="btn" data-action="export" data-what="articles">${icon('download', 16)} ${mod('inventory') ? 'Artikel & Bestände' : 'Produkte & Leistungen'}</button>` : ''}
+          ${mod('inventory') ? `<button class="btn" data-action="export" data-what="movements">${icon('download', 16)} Lagerbewegungen</button>` : ''}
+          ${docKindsOn().length ? `<button class="btn" data-action="export" data-what="documents">${icon('download', 16)} Belege</button>` : ''}
+          ${mod('contacts') ? `<button class="btn" data-action="export" data-what="contacts">${icon('download', 16)} Kontakte</button>` : ''}
           <button class="btn" data-action="export" data-what="backup">${icon('download', 16)} Komplett-Backup (JSON)</button>
         </div>
       </section>`;
@@ -1738,102 +2076,176 @@
   }
 
   // =============================================================== Ansicht: Einstellungen
+  const SET_TABS = [['features', 'Funktionen', 'sliders'], ['company', 'Firma & Belege', 'briefcase'], ['team', 'Team', 'users'], ['account', 'Mein Konto', 'shield'], ['system', 'Darstellung & Sync', 'settings']];
+
   function viewSettings() {
-    const s = settings();
+    const tab = SET_TABS.some(([k]) => k === UI.q.setTab) ? UI.q.setTab : 'features';
+    const tabs = `<div class="tabs" role="tablist">${SET_TABS.map(([k, l, ic]) => `<button role="tab" data-action="set-ui" data-k="setTab" data-v="${k}" class="${tab === k ? 'active' : ''}">${icon(ic, 16)}<span>${l}</span></button>`).join('')}</div>`;
+    const body = { features: settingsFeatures, company: settingsCompany, team: settingsTeam, account: settingsAccount, system: settingsSystem }[tab]();
+    return `${tabs}${body}<p class="muted small center">NEXCOUNT by Andrerer · Das Buchhaltungs- und Lagersystem für die Kleinen</p>`;
+  }
+
+  function settingsFeatures() {
     const admin = S.user.role === 'admin';
-    const theme = themePref();
-    return `
+    const mods = modulesOn() || allModulesOn();
+    return `<div class="grid-2 wide-left">
+      <section class="card">
+        <div class="card-head"><h3>Funktionen</h3><span class="muted">Schalte ein, was du brauchst</span></div>
+        ${admin ? '' : '<div class="alert info" style="margin-bottom:12px">Nur Administratoren können Funktionen ändern.</div>'}
+        ${moduleList(mods, 'settings', !admin)}
+        <p class="muted small" style="margin-top:12px">Ausgeschaltete Bereiche werden nur ausgeblendet – vorhandene Daten bleiben erhalten und sind beim Wiedereinschalten sofort wieder da. Die Auswahl gilt für das ganze Team.</p>
+      </section>
+      <section class="card">
+        <div class="card-head"><h3>Vorlagen</h3></div>
+        <p class="muted small" style="margin-bottom:12px">Mit einem Klick auf eine passende Kombination umstellen:</p>
+        <div class="preset-list">${Object.entries(PRESETS).map(([k, p]) => `<button type="button" class="preset row" data-action="apply-preset" data-preset="${k}" ${admin ? '' : 'disabled'}>
+          <span class="preset-ic">${icon(p.icon, 18)}</span><span><b>${esc(p.label)}</b><small>${esc(p.desc)}</small></span></button>`).join('')}</div>
+      </section>
+    </div>`;
+  }
+
+  function settingsCompany() {
+    const s = settings();
+    return `<form data-form="company" class="stack">
       <div class="grid-2">
         <section class="card">
-          <div class="card-head"><h3>Firmendaten</h3><span class="muted">erscheinen auf Rechnungen</span></div>
-          <form data-form="company" class="stack">
-            <div class="grid2">
-              ${field('Firmenname', inp('name', s.name || companyName(), 'required maxlength="120"'), 'span2')}
-              ${field('Inhaber / Geschäftsführer', inp('owner', s.owner, 'maxlength="100"'), 'span2')}
-              ${field('Straße & Hausnr.', inp('street', s.street, 'maxlength="120"'), 'span2')}
-              ${field('PLZ', inp('zip', s.zip, 'maxlength="12"'))}
-              ${field('Ort', inp('city', s.city, 'maxlength="80"'))}
-              ${field('Telefon', inp('phone', s.phone, 'maxlength="40"'))}
-              ${field('E-Mail', inp('email', s.email, 'type="email" maxlength="120"'))}
-              ${field('Website', inp('website', s.website, 'maxlength="120"'), 'span2')}
-              ${field('Steuernummer', inp('taxNumber', s.taxNumber, 'maxlength="30"'))}
-              ${field('USt-IdNr.', inp('vatId', s.vatId, 'maxlength="30"'))}
-              ${field('Bank', inp('bank', s.bank, 'maxlength="80"'))}
-              ${field('IBAN', inp('iban', s.iban, 'maxlength="40"'))}
-              ${field('BIC', inp('bic', s.bic, 'maxlength="20"'))}
-              ${field('Zahlungsziel (Tage)', numInp('paymentDays', s.paymentDays ?? 14, 'min="0" max="365"'))}
-              ${field('Präfix Rechnungen', inp('invoicePrefix', s.invoicePrefix || 'RE', 'maxlength="8" pattern="[A-Za-z0-9]+"'))}
-              ${field('Präfix Einkäufe', inp('purchasePrefix', s.purchasePrefix || 'EK', 'maxlength="8" pattern="[A-Za-z0-9]+"'))}
-              ${field('Fußtext auf Rechnungen', textarea('invoiceFooter', s.invoiceFooter || 'Vielen Dank für Ihren Auftrag! Bitte überweisen Sie den Betrag unter Angabe der Rechnungsnummer.', 'maxlength="1000" rows="2"'), 'span2')}
-            </div>
-            <label class="check"><input type="checkbox" name="smallBusiness" ${s.smallBusiness ? 'checked' : ''}> Kleinunternehmer nach § 19 UStG (keine Umsatzsteuer ausweisen)</label>
-            <div><button class="btn primary" type="submit">Firmendaten speichern</button></div>
-          </form>
-        </section>
-        <div class="stack" style="gap:18px;align-content:start">
-          <section class="card">
-            <div class="card-head"><h3>Synchronisierung</h3><button class="btn sm" data-action="sync-now">${icon('sync', 14)} Jetzt synchronisieren</button></div>
-            <div class="meta">
-              <div><span>Status</span><b>${S.online ? (S.syncError ? `Fehler: ${esc(S.syncError)}` : 'Online · Live-Verbindung') : 'Offline'}</b></div>
-              <div><span>Letzte Synchronisierung</span><b>${S.lastSync ? fmtTime(S.lastSync) : '—'}</b></div>
-              <div><span>Ausstehende Änderungen</span><b>${S.pending.length}</b></div>
-              <div><span>Datenstand (Revision)</span><b>${S.seq}</b></div>
-            </div>
-            <p class="muted small" style="margin-top:12px">Alle Änderungen werden lokal gespeichert und automatisch mit dem Server abgeglichen. Andere Geräte erhalten Updates in Echtzeit. Bei gleichzeitiger Bearbeitung desselben Datensatzes gewinnt die neueste Änderung.</p>
-            <div class="toolbar" style="margin-top:12px"><button class="btn sm" data-action="rebuild-cache">Lokalen Cache neu aufbauen</button></div>
-          </section>
-          <section class="card">
-            <div class="card-head"><h3>Mein Konto</h3><span class="badge ${admin ? 'open' : ''}">${admin ? 'Administrator' : 'Mitarbeiter'}</span></div>
-            <form data-form="profile" class="grid2" style="margin-bottom:16px">
-              ${field('Name', inp('name', S.user.name, 'required maxlength="80"'))}
-              ${field('E-Mail', `<input value="${esc(S.user.email)}" readonly>`)}
-              <div><button class="btn sm" type="submit">Name speichern</button></div>
-            </form>
-            <form data-form="password" class="grid2">
-              ${field('Neues Passwort', '<input name="newPassword" type="password" required minlength="8" autocomplete="new-password">')}
-              ${field('Neues Passwort wiederholen', '<input name="newPassword2" type="password" required minlength="8" autocomplete="new-password">')}
-              <div><button class="btn sm" type="submit">Passwort ändern</button></div>
-            </form>
-          </section>
-          <section class="card">
-            <div class="card-head"><h3>Darstellung</h3></div>
-            <div class="seg">${[['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']].map(([v, l]) => `<button data-action="theme" data-v="${v}" class="${theme === v ? 'active' : ''}">${l}</button>`).join('')}</div>
-          </section>
-        </div>
-      </div>
-      ${admin ? `<section class="card">
-        <div class="card-head"><h3>Team & Zugänge</h3><span class="muted">${S.members.length} Benutzer</span></div>
-        <div class="grid-2">
-          <div class="stack">
-            <p class="muted">Neue Mitarbeiter registrieren sich mit diesem Einladungscode und arbeiten sofort im selben Datenbestand.</p>
-            <div class="code-box"><span class="code">${esc(S.company.inviteCode || '—')}</span>
-              <button class="btn sm" data-action="invite-copy">${icon('copy', 14)} Kopieren</button>
-              <button class="btn sm" data-action="invite-rotate">${icon('sync', 14)} Neuer Code</button></div>
+          <div class="card-head"><h3>Firmendaten</h3><span class="muted">erscheinen auf deinen Belegen</span></div>
+          <div class="grid2">
+            ${field('Firmenname', inp('name', s.name || companyName(), 'required maxlength="120"'), 'span2')}
+            ${field('Inhaber / Geschäftsführer', inp('owner', s.owner, 'maxlength="100"'), 'span2')}
+            ${field('Straße & Hausnr.', inp('street', s.street, 'maxlength="120"'), 'span2')}
+            ${field('PLZ', inp('zip', s.zip, 'maxlength="12"'))}
+            ${field('Ort', inp('city', s.city, 'maxlength="80"'))}
+            ${field('Telefon', inp('phone', s.phone, 'maxlength="40"'))}
+            ${field('E-Mail', inp('email', s.email, 'type="email" maxlength="120"'))}
+            ${field('Website', inp('website', s.website, 'maxlength="120"'), 'span2')}
           </div>
-          <div class="table-wrap"><table>
-            <thead><tr><th>Name</th><th>E-Mail</th><th>Rolle</th><th></th></tr></thead>
-            <tbody>${S.members.slice().sort(byName).map((m) => `<tr>
-              <td><b>${esc(m.name)}</b>${m.id === S.user.id ? ' <span class="muted small">(du)</span>' : ''}</td>
-              <td>${esc(m.email)}</td>
-              <td>${m.role === 'admin' ? 'Admin' : 'Mitarbeiter'}</td>
-              <td class="actions">${m.id === S.user.id ? '' : `<button class="btn sm" data-action="member-role" data-id="${m.id}" data-role="${m.role === 'admin' ? 'member' : 'admin'}">${m.role === 'admin' ? 'Zu Mitarbeiter' : 'Zu Admin'}</button>
-                <button class="btn sm danger" data-action="member-remove" data-id="${m.id}">Entfernen</button>`}</td></tr>`).join('')}</tbody>
-          </table></div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h3>Steuern & Bank</h3></div>
+          <div class="grid2">
+            ${field('Steuernummer', inp('taxNumber', s.taxNumber, 'maxlength="30"'))}
+            ${field('USt-IdNr.', inp('vatId', s.vatId, 'maxlength="30"'))}
+            ${field('Bank', inp('bank', s.bank, 'maxlength="80"'), 'span2')}
+            ${field('IBAN', inp('iban', s.iban, 'maxlength="40"'))}
+            ${field('BIC', inp('bic', s.bic, 'maxlength="20"'))}
+          </div>
+          <label class="check" style="margin-top:14px"><input type="checkbox" name="smallBusiness" ${s.smallBusiness ? 'checked' : ''}> Kleinunternehmer nach § 19 UStG (keine Umsatzsteuer ausweisen)</label>
+        </section>
+      </div>
+      <section class="card">
+        <div class="card-head"><h3>Belege</h3><span class="muted">Nummernkreise, Fristen und Texte</span></div>
+        <div class="grid3">
+          ${mod('invoices') ? field('Präfix Rechnungen', inp('invoicePrefix', s.invoicePrefix || 'RE', 'maxlength="8" pattern="[A-Za-z0-9]+"')) : ''}
+          ${mod('invoices') ? field('Zahlungsziel (Tage)', numInp('paymentDays', s.paymentDays ?? 14, 'min="0" max="365"')) : ''}
+          ${mod('quotes') ? field('Präfix Angebote', inp('quotePrefix', s.quotePrefix || 'AN', 'maxlength="8" pattern="[A-Za-z0-9]+"')) : ''}
+          ${mod('quotes') ? field('Angebote gültig (Tage)', numInp('quoteDays', s.quoteDays ?? 30, 'min="1" max="365"')) : ''}
+          ${mod('purchases') ? field('Präfix Einkäufe', inp('purchasePrefix', s.purchasePrefix || 'EK', 'maxlength="8" pattern="[A-Za-z0-9]+"')) : ''}
         </div>
+        <div class="grid2" style="margin-top:12px">
+          ${mod('invoices') ? field('Schlusstext auf Rechnungen', textarea('invoiceFooter', s.invoiceFooter ?? 'Vielen Dank für Ihren Auftrag! Bitte überweisen Sie den Betrag unter Angabe der Rechnungsnummer.', 'maxlength="1000" rows="3"')) : ''}
+          ${mod('quotes') ? field('Schlusstext auf Angeboten', textarea('quoteFooter', s.quoteFooter ?? 'Wir freuen uns auf Ihren Auftrag.', 'maxlength="1000" rows="3"')) : ''}
+        </div>
+        ${!mod('invoices') && !mod('quotes') && !mod('purchases') ? '<p class="muted small">Belege sind ausgeschaltet – aktiviere Rechnungen, Angebote oder Einkäufe unter „Funktionen“.</p>' : ''}
+      </section>
+      <div><button class="btn primary" type="submit">${icon('check', 16)} Speichern</button></div>
+    </form>`;
+  }
+
+  function settingsTeam() {
+    if (S.user.role !== 'admin') {
+      return `<section class="card"><div class="card-head"><h3>Team</h3></div>
+        <p class="muted">Du bist als <b>Mitarbeiter</b> in <b>${esc(companyName())}</b>. Das Team und die Einladungen verwaltet ein Administrator deiner Firma.</p></section>`;
+    }
+    return `<div class="grid-2 wide-right">
+      <section class="card">
+        <div class="card-head"><h3>Einladen</h3></div>
+        <p class="muted small" style="margin-bottom:12px">Neue Mitarbeiter registrieren sich mit diesem Code und arbeiten sofort im selben Datenbestand.</p>
+        <div class="code-box"><span class="code">${esc(S.company.inviteCode || '—')}</span></div>
+        <div class="toolbar" style="margin-top:12px">
+          <button class="btn sm" data-action="invite-copy">${icon('copy', 14)} Kopieren</button>
+          <button class="btn sm" data-action="invite-rotate">${icon('sync', 14)} Neuer Code</button>
+        </div>
+      </section>
+      <section class="card flush">
+        <div class="card-head"><h3>Mitglieder</h3><span class="muted">${S.members.length} Benutzer</span></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Name</th><th>E-Mail</th><th>Rolle</th><th></th></tr></thead>
+          <tbody>${S.members.slice().sort(byName).map((m) => `<tr>
+            <td><div class="person"><span class="avatar sm">${esc(initials(m.name))}</span><b>${esc(m.name)}</b>${m.id === S.user.id ? ' <span class="muted small">(du)</span>' : ''}</div></td>
+            <td>${esc(m.email)}</td>
+            <td><span class="badge ${m.role === 'admin' ? 'info' : ''}">${m.role === 'admin' ? 'Admin' : 'Mitarbeiter'}</span></td>
+            <td class="actions">${m.id === S.user.id ? '' : `<button class="btn sm" data-action="member-role" data-id="${m.id}" data-role="${m.role === 'admin' ? 'member' : 'admin'}">${m.role === 'admin' ? 'Zu Mitarbeiter' : 'Zu Admin'}</button>
+              <button class="btn sm danger" data-action="member-remove" data-id="${m.id}">Entfernen</button>`}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </section>
+    </div>`;
+  }
+
+  function settingsAccount() {
+    const admin = S.user.role === 'admin';
+    return `<div class="grid-2">
+      <section class="card">
+        <div class="card-head"><h3>Profil</h3><span class="badge ${admin ? 'info' : ''}">${admin ? 'Administrator' : 'Mitarbeiter'}</span></div>
+        <form data-form="profile" class="stack">
+          ${field('Name', inp('name', S.user.name, 'required maxlength="80"'))}
+          ${field('E-Mail', `<input value="${esc(S.user.email)}" readonly>`)}
+          <div><button class="btn" type="submit">Name speichern</button></div>
+        </form>
+      </section>
+      <section class="card">
+        <div class="card-head"><h3>Passwort ändern</h3></div>
+        <form data-form="password" class="stack">
+          ${field('Neues Passwort', '<input name="newPassword" type="password" required minlength="8" autocomplete="new-password">')}
+          ${field('Neues Passwort wiederholen', '<input name="newPassword2" type="password" required minlength="8" autocomplete="new-password">')}
+          <div><button class="btn" type="submit">Passwort ändern</button></div>
+        </form>
+      </section>
+      <section class="card">
+        <div class="card-head"><h3>Abmelden</h3></div>
+        <p class="muted small" style="margin-bottom:12px">Beim Abmelden werden die lokal gespeicherten Daten auf diesem Gerät gelöscht.</p>
+        <button class="btn danger" data-action="logout">${icon('logout', 16)} Abmelden</button>
+      </section>
+    </div>`;
+  }
+
+  function settingsSystem() {
+    const theme = themePref();
+    return `<div class="grid-2">
+      <section class="card">
+        <div class="card-head"><h3>Darstellung</h3></div>
+        <div class="seg">${[['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']].map(([v, l]) => `<button data-action="theme" data-v="${v}" class="${theme === v ? 'active' : ''}">${l}</button>`).join('')}</div>
+      </section>
+      <section class="card">
+        <div class="card-head"><h3>Synchronisierung</h3><button class="btn sm" data-action="sync-now">${icon('sync', 14)} Jetzt synchronisieren</button></div>
+        <div class="meta">
+          <div><span>Status</span><b>${S.online ? (S.syncError ? `Fehler: ${esc(S.syncError)}` : 'Online · Live-Verbindung') : 'Offline'}</b></div>
+          <div><span>Letzte Synchronisierung</span><b>${S.lastSync ? fmtTime(S.lastSync) : '—'}</b></div>
+          <div><span>Ausstehende Änderungen</span><b>${S.pending.length}</b></div>
+          <div><span>Datenstand</span><b>Rev. ${S.seq}</b></div>
+        </div>
+        <p class="muted small" style="margin-top:12px">Änderungen werden sofort lokal gespeichert und automatisch abgeglichen – auch nach einer Offline-Phase. Andere Geräte sehen sie in Echtzeit.</p>
+        <div class="toolbar" style="margin-top:12px"><button class="btn sm" data-action="rebuild-cache">Lokalen Cache neu aufbauen</button></div>
+      </section>
+      ${S.user.role === 'admin' ? `<section class="card">
+        <div class="card-head"><h3>Beispieldaten</h3></div>
+        <p class="muted small" style="margin-bottom:12px">Legt Beispiel-Kunden, Produkte, Leistungen, Belege und Buchungen an – praktisch zum Ausprobieren.</p>
+        <button class="btn" data-action="demo">${icon('sparkle', 16)} Beispieldaten laden</button>
       </section>` : ''}
-      <p class="muted small" style="text-align:center">NEXCOUNT v1.0 · by Andrerer</p>`;
+    </div>`;
   }
 
   // =============================================================== Demo-Daten
   function seedDemo() {
-    if (!confirm('Beispieldaten (Artikel, Kontakte, Buchungen, Rechnungen) anlegen? Sie werden mit deinem Team synchronisiert.')) return;
+    if (!confirm('Beispieldaten (Kunden, Produkte, Leistungen, Belege, Buchungen) anlegen? Sie werden mit deinem Team synchronisiert.')) return;
     const s = settings();
-    if (!s.street) put('settings', { ...s, id: 'company', name: s.name || companyName(), street: 'Hauptstraße 12', zip: '10115', city: 'Berlin', email: 'info@example.com', taxNumber: '12/345/67890', iban: 'DE02 1203 0000 0000 2020 51', bic: 'BYLADEM1001', bank: 'Musterbank', paymentDays: 14 });
+    const demoFirm = s.street ? {} : { name: s.name || companyName(), street: 'Hauptstraße 12', zip: '10115', city: 'Berlin', email: 'info@example.com', taxNumber: '12/345/67890', iban: 'DE02 1203 0000 0000 2020 51', bic: 'BYLADEM1001', bank: 'Musterbank', paymentDays: 14 };
+    put('settings', { ...s, ...demoFirm, id: 'company', setupDone: true, modules: modulesOn() || allModulesOn() });
     const k1 = put('contacts', { type: 'customer', number: 'K-0001', name: 'Müller Gastro GmbH', contactPerson: 'Anna Müller', email: 'einkauf@mueller-gastro.example', phone: '030 1234567', street: 'Lindenallee 4', zip: '10117', city: 'Berlin', country: 'Deutschland' });
     const k2 = put('contacts', { type: 'customer', number: 'K-0002', name: 'Café Sonnenschein', contactPerson: 'Jonas Weber', email: 'hallo@cafe-sonnenschein.example', street: 'Marktplatz 1', zip: '14467', city: 'Potsdam', country: 'Deutschland' });
     const l1 = put('contacts', { type: 'supplier', number: 'L-0001', name: 'Rösterei Nordlicht KG', email: 'vertrieb@nordlicht.example', street: 'Hafenstraße 22', zip: '20457', city: 'Hamburg', country: 'Deutschland' });
     const mk = (sku, name, category, unit, ek, vk, tax, min, location, initial) => {
-      const a = put('articles', { sku, name, category, unit, ek, vk, tax, min, location });
+      const a = put('articles', { type: 'product', sku, name, category, unit, ek, vk, tax, min, location });
       put('movements', { articleId: a.id, qty: initial, type: 'initial', date: addDays(today(), -60), unitCost: ek, note: 'Anfangsbestand' });
       return a;
     };
@@ -1842,11 +2254,14 @@
     const a3 = mk('A-0003', 'Coffee-to-go Becher 300 ml (50 Stk)', 'Verpackung', 'Pkt', 4.2, 8.5, 19, 15, 'Regal B2', 22);
     mk('A-0004', 'Siebträger-Reinigungstabletten', 'Zubehör', 'Pkt', 6.8, 12.9, 19, 5, 'Regal C1', 12);
     mk('A-0005', 'Milchkännchen Edelstahl 600 ml', 'Zubehör', 'Stk', 9.5, 19.0, 19, 3, 'Regal C2', 7);
+    const sv1 = put('articles', { type: 'service', sku: 'L-0001', name: 'Barista-Schulung', category: 'Schulung', unit: 'Std', ek: 0, vk: 65, tax: 19 });
+    const sv2 = put('articles', { type: 'service', sku: 'L-0002', name: 'Wartung Siebträgermaschine', category: 'Service', unit: 'Std', ek: 0, vk: 79, tax: 19 });
     const inv1 = { id: uid(), kind: 'sale', status: 'draft', date: addDays(today(), -24), dueDate: addDays(today(), -10), contactId: k1.id, contact: { name: k1.name, contactPerson: k1.contactPerson, street: k1.street, zip: k1.zip, city: k1.city, country: k1.country, number: k1.number }, items: [{ articleId: a1.id, text: a1.name, qty: 12, price: 19.9, tax: 7, unit: 'Stk' }, { articleId: a3.id, text: a3.name, qty: 4, price: 8.5, tax: 19, unit: 'Pkt' }], notes: '' };
     const d1 = finalizeDoc(inv1);
     markDocPaid(d1, addDays(today(), -12), 'Bank');
-    const inv2 = { id: uid(), kind: 'sale', status: 'draft', date: addDays(today(), -5), dueDate: addDays(today(), 9), contactId: k2.id, contact: { name: k2.name, contactPerson: k2.contactPerson, street: k2.street, zip: k2.zip, city: k2.city, country: k2.country, number: k2.number }, items: [{ articleId: a2.id, text: a2.name, qty: 24, price: 2.6, tax: 7, unit: 'Stk' }, { articleId: '', text: 'Barista-Schulung (2 Std.)', qty: 2, price: 65, tax: 19, unit: 'Std' }], notes: '' };
+    const inv2 = { id: uid(), kind: 'sale', status: 'draft', date: addDays(today(), -5), dueDate: addDays(today(), 9), contactId: k2.id, contact: { name: k2.name, contactPerson: k2.contactPerson, street: k2.street, zip: k2.zip, city: k2.city, country: k2.country, number: k2.number }, items: [{ articleId: a2.id, text: a2.name, qty: 24, price: 2.6, tax: 7, unit: 'Stk' }, { articleId: sv1.id, text: sv1.name, qty: 2, price: 65, tax: 19, unit: 'Std' }], notes: '' };
     finalizeDoc(inv2);
+    finalizeDoc({ id: uid(), kind: 'quote', status: 'draft', date: addDays(today(), -3), dueDate: addDays(today(), 27), contactId: k1.id, contact: inv1.contact, reference: 'Jahreswartung 2027', items: [{ articleId: sv2.id, text: `${sv2.name} (4 Termine)`, qty: 8, price: 79, tax: 19, unit: 'Std' }, { articleId: a1.id, text: a1.name, qty: 24, price: 18.9, tax: 7, unit: 'Stk' }], notes: '' });
     const p1 = { id: uid(), kind: 'purchase', status: 'draft', date: addDays(today(), -30), dueDate: '', contactId: l1.id, contact: { name: l1.name, street: l1.street, zip: l1.zip, city: l1.city }, reference: 'NL-88412', items: [{ articleId: a1.id, text: a1.name, qty: 30, price: 11.9, tax: 7, unit: 'Stk' }], notes: '' };
     markDocPaid(finalizeDoc(p1), addDays(today(), -28), 'Bank');
     const ent = (daysAgo, kind, category, description, gross, rate, method) => put('entries', { date: addDays(today(), -daysAgo), kind, category, description, method, rate, ...splitGross(gross, rate) });
@@ -1924,7 +2339,8 @@
     company(fd) {
       const data = { ...settings(), id: 'company' };
       for (const [k, v] of Object.entries(fd)) data[k] = typeof v === 'string' ? v.trim() : v;
-      data.paymentDays = num(fd.paymentDays);
+      if ('paymentDays' in fd) data.paymentDays = num(fd.paymentDays);
+      if ('quoteDays' in fd) data.quoteDays = num(fd.quoteDays);
       data.smallBusiness = fd.smallBusiness === 'on';
       put('settings', data);
       if (S.user.role === 'admin' && data.name && data.name !== S.company.name) {
@@ -1977,7 +2393,33 @@
       render();
     },
     theme: (el) => { try { localStorage.setItem('nexcount:theme', el.dataset.v); } catch { /* egal */ } applyTheme(); render(); },
-    'new-article': () => openArticle(),
+    'new-article': (el) => openArticle(null, el.dataset.kind),
+    'quick-new': () => {
+      const m = $('#quick-menu');
+      if (m.classList.contains('open')) return m.classList.remove('open');
+      m.innerHTML = `<div class="menu-label">Neu anlegen</div>${quickItems().map((q) => quickBtn(q, 'menu-item')).join('')}`;
+      m.classList.add('open');
+    },
+    'setup-preset': (el) => {
+      const p = PRESETS[el.dataset.preset];
+      UI.setup.preset = el.dataset.preset;
+      UI.setup.modules = Object.fromEntries(ALL_MODULES.map((k) => [k, p.modules.includes(k)]));
+      render();
+    },
+    'setup-finish': () => {
+      const s = settings();
+      put('settings', { ...s, id: 'company', name: s.name || companyName(), modules: UI.setup.modules, smallBusiness: !!UI.setup.smallBusiness, setupDone: true });
+      UI.setup = null;
+      toast('Eingerichtet – viel Erfolg mit NEXCOUNT!', 'ok');
+      render();
+    },
+    'apply-preset': (el) => {
+      const p = PRESETS[el.dataset.preset];
+      if (!confirm(`Vorlage „${p.label}“ übernehmen? Nicht enthaltene Bereiche werden ausgeblendet – ihre Daten bleiben erhalten.`)) return;
+      put('settings', { ...settings(), id: 'company', setupDone: true, modules: Object.fromEntries(ALL_MODULES.map((k) => [k, p.modules.includes(k)])) });
+      toast(`Vorlage „${p.label}“ aktiv`, 'ok');
+      render();
+    },
     'edit-article': (el) => openArticle(el.dataset.id),
     'archive-article': (el) => {
       const a = get('articles', el.dataset.id);
@@ -2032,11 +2474,40 @@
   // =============================================================== Globale Events
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-action]');
+    // offene Menüs schließen, wenn außerhalb geklickt wird
+    const qm = $('#quick-menu');
+    if (qm && qm.classList.contains('open') && !e.target.closest('.quick-wrap')) qm.classList.remove('open');
+    const shell = $('#shell');
+    if (shell && shell.classList.contains('menu-open') && !e.target.closest('.sidebar') && !(el && el.dataset.action === 'toggle-menu')) {
+      shell.classList.remove('menu-open');
+      if (!el) return;
+    }
     if (!el || !ACTIONS[el.dataset.action]) return;
     if (el.closest('#modal-root') && !['archive-article', 'inventory'].includes(el.dataset.action)) return;
     e.preventDefault();
     if (el.closest('#modal-root')) closeModal();
+    if (el.closest('#quick-menu')) qm.classList.remove('open');
     try { ACTIONS[el.dataset.action](el, e); } catch (err) { toast(err.message, 'error'); }
+  });
+  // Funktionen ein-/ausschalten (Einrichtung und Einstellungen)
+  document.addEventListener('change', (e) => {
+    const el = e.target;
+    if (!el.dataset) return;
+    if (el.dataset.setup === 'smallBusiness' && UI.setup) { UI.setup.smallBusiness = el.checked; return; }
+    const key = el.dataset.module;
+    if (!key) return;
+    const before = el.dataset.scope === 'setup' ? UI.setup.modules : (modulesOn() || allModulesOn());
+    const next = toggleModule(before, key, el.checked);
+    const also = ALL_MODULES.filter((k) => k !== key && !!before[k] !== !!next[k]).map((k) => MODULES[k].label);
+    if (el.dataset.scope === 'setup') {
+      UI.setup.modules = next;
+      UI.setup.preset = '';
+    } else {
+      put('settings', { ...settings(), id: 'company', setupDone: true, modules: next });
+      toast(`${MODULES[key].label} ${el.checked ? 'aktiviert' : 'ausgeblendet'}${also.length ? ` – ebenso ${also.join(', ')}` : ''}`, 'ok');
+    }
+    if (also.length && el.dataset.scope === 'setup') toast(`Automatisch ${el.checked ? 'aktiviert' : 'ausgeschaltet'}: ${also.join(', ')}`);
+    render();
   });
   document.addEventListener('input', (e) => {
     const el = e.target;

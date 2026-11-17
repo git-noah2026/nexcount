@@ -1,7 +1,28 @@
-# NEXCOUNT – Buchhaltungs- & Lagersystem by Andrerer
+# NEXCOUNT by Andrerer – Das Buchhaltungs- und Lagersystem für die Kleinen
 
-Web-App für kleine Unternehmen: Warenwirtschaft, Rechnungen, Kassenbuch und Auswertungen –
-mit Benutzeranmeldung, Teams und Echtzeit-Synchronisierung zwischen allen Geräten.
+Web-App für kleine Unternehmen: Rechnungen, Angebote, Kassenbuch und – wenn man eins braucht –
+ein Lager. Mit Benutzeranmeldung, Teams und Echtzeit-Synchronisierung zwischen allen Geräten.
+
+## Nur was du brauchst
+
+Beim ersten Start wählt der Admin eine Vorlage (Dienstleister, Handel, Handwerk, Nur Kassenbuch,
+Alles); danach lassen sich die Funktionen unter **Einstellungen → Funktionen** jederzeit
+an- und ausschalten. Ausgeschaltete Bereiche werden nur ausgeblendet, ihre Daten bleiben erhalten.
+
+| Funktion               | Inhalt                                                             | benötigt           |
+|------------------------|--------------------------------------------------------------------|--------------------|
+| Kassenbuch             | Einnahmen & Ausgaben (immer aktiv)                                 | –                  |
+| Rechnungen             | Schreiben, drucken, Zahlung → Kassenbuch, Zahlungserinnerung       | Kontakte           |
+| Angebote               | Angebote erstellen, mit einem Klick in eine Rechnung umwandeln     | Rechnungen         |
+| Einkäufe               | Eingangsrechnungen von Lieferanten                                 | Kontakte           |
+| Kunden & Lieferanten   | Adressbuch mit Umsatz je Kontakt                                   | –                  |
+| Produkte & Leistungen  | Preisliste; Leistungen ohne Bestand                                | –                  |
+| Lagerverwaltung        | Bestände, Wareneingang/-ausgang, Inventur, Mindestbestand          | Produkte & Leist.  |
+| Berichte & Export      | EÜR, Umsatzsteuer, CSV/Backup                                      | –                  |
+
+Bestand wird nur für **Produkte** geführt und nur, solange die Lagerverwaltung aktiv ist.
+Belege, die ohne aktives Lager festgeschrieben wurden, buchen nachträglich keinen Bestand –
+nach dem Einschalten des Lagers einmal eine Inventur machen.
 
 | Teil              | Dienst                                                                  |
 |-------------------|-------------------------------------------------------------------------|
