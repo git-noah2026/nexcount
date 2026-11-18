@@ -531,3 +531,117 @@ td.actions { white-space: nowrap; text-align: right; width: 1%; }
   .modal-foot { border-radius: 0; }
   .menu { position: fixed; left: 12px; right: 12px; top: 64px; min-width: 0; }
 }
+
+/* =====================================================================
+   Organisationsarten, Einrichtung, NEXCOUNT Lager als eigener Bereich
+   ===================================================================== */
+
+/* Lager-Bereich bekommt eine eigene Akzentfarbe */
+body[data-space="stock"] { --primary: #0d9488; --primary-hover: #0f766e; --primary-soft: #e3f6f3; --primary-ring: rgba(13, 148, 136, .22); --hero-from: #0f766e; --hero-to: #0891b2; }
+:root[data-theme="dark"] body[data-space="stock"] { --primary: #2dd4bf; --primary-hover: #5eead4; --primary-soft: #11332f; --primary-ring: rgba(45, 212, 191, .28); --hero-from: #115e59; --hero-to: #155e75; }
+
+.space-switch { display: flex; gap: 4px; padding: 4px; margin: 0 4px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+.space-switch button { position: relative; flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 6px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font: inherit; font-weight: 650; font-size: 13px; cursor: pointer; }
+.space-switch button:hover { color: var(--text); }
+.space-switch button.active { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-sm), 0 0 0 1px var(--border); }
+.dot-badge.static { position: absolute; top: 6px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--neg); }
+
+/* Schrittanzeige */
+.stepper { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.stepper li { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 99px; background: var(--surface-2); color: var(--muted); font-weight: 650; font-size: 13px; }
+.stepper li span { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); color: var(--muted); font-size: 12px; }
+.stepper li.active { background: var(--primary-soft); color: var(--primary); }
+.stepper li.active span { background: var(--primary); color: var(--on-primary); }
+.stepper li.done span { background: var(--pos-soft); color: var(--pos); }
+.stepper.small li { padding: 4px 10px 4px 4px; font-size: 12px; }
+.stepper.small li span { width: 20px; height: 20px; font-size: 11px; }
+
+.setup-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.setup-top .eyebrow { margin: 0; }
+.setup-foot { display: flex; align-items: center; gap: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
+.setup-form { display: grid; gap: 16px; max-width: 860px; }
+
+/* Organisationsart-Karten */
+.type-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.type-grid.auth-types { grid-template-columns: 1fr 1fr; gap: 10px; }
+.type-card {
+  position: relative; display: grid; gap: 6px; align-content: start; text-align: left; padding: 16px; border-radius: 14px;
+  border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font: inherit; cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, transform .1s;
+}
+.type-card:hover { border-color: var(--primary); transform: translateY(-1px); }
+.type-card.active { border-color: var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 3px var(--primary-ring); }
+.type-card.active .preset-ic { background: var(--primary); color: var(--on-primary); }
+.type-card b { font-size: 14px; line-height: 1.3; }
+.type-card small { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.type-card input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+.type-card:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+.auth-types .type-card { padding: 12px; }
+.auth-types .type-card small { font-size: 12px; }
+
+.check-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.check-card { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; }
+.check-card.on { border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); background: color-mix(in srgb, var(--primary-soft) 55%, var(--surface)); }
+.check-card input { margin-top: 2px; }
+.check-card b { display: block; }
+.check-card small { color: var(--muted); font-size: 12.5px; }
+
+/* Funktionen: Trenner, Systemkarte Lager */
+.list-divider { margin: 10px 2px 2px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.system-card { display: grid; gap: 6px; padding: 6px; border-radius: 14px; border: 1.5px dashed var(--border-strong); background: var(--surface-2); }
+.system-card.on { border-style: solid; border-color: color-mix(in srgb, #0d9488 45%, var(--border)); background: color-mix(in srgb, #0d9488 6%, var(--surface)); }
+.system-card .module.system .module-ic { background: color-mix(in srgb, #0d9488 14%, var(--surface)); color: #0d9488; }
+.module.sub { margin-left: 26px; padding: 10px 12px; }
+
+/* Hinweise & Teaser */
+.hint-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; background: var(--info-soft); color: var(--text-2); font-size: 13px; }
+.hint-bar > .ic { color: var(--info); }
+.hint-bar span { flex: 1; }
+.hint-bar.warn { background: var(--warn-soft); }
+.hint-bar.warn > .ic { color: var(--warn); }
+.system-teaser, .link-card, .timer-card {
+  display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+}
+.system-teaser > .ic { color: #0d9488; }
+.system-teaser div, .link-card div, .timer-card div { flex: 1; min-width: 0; }
+.system-teaser b, .link-card b, .timer-card b { display: block; }
+.system-teaser span, .link-card span, .timer-card span { font-size: 13px; color: var(--text-2); }
+.link-card.on { border-color: color-mix(in srgb, var(--primary) 40%, var(--border)); }
+.switch-label { display: inline-flex; align-items: center; gap: 10px; font-weight: 650; font-size: 13px; color: var(--text-2); cursor: pointer; }
+.timer-card { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); background: color-mix(in srgb, var(--primary-soft) 50%, var(--surface)); }
+.timer-card > .ic { color: var(--primary); animation: pulse 1.6s infinite; }
+.timer-card [data-timer-since] { font: 700 22px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--text); }
+
+.bill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.bill-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); }
+.bill-item div { flex: 1; min-width: 0; display: grid; }
+
+.form-section { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-top: 1px solid var(--border); margin-top: 4px; padding-top: 12px; }
+.form-section.span2 { grid-column: 1 / -1; }
+.span3 { grid-column: 1 / -1; }
+.row-actions { display: flex; justify-content: space-between; gap: 8px; }
+.link-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border: 1px dashed var(--border-strong); border-radius: 12px; background: transparent; color: var(--primary); font: inherit; font-weight: 600; cursor: pointer; }
+.link-btn:hover { background: var(--primary-soft); }
+
+/* Zuwendungsbestätigung (Druck) */
+.print-doc.receipt h2 { font-size: 17px; margin: 18px 0 2px; }
+.print-doc .p-small { font-size: 9.5px; color: #333; margin-top: 8px; }
+.print-doc .p-field { margin-top: 14px; padding: 8px 10px; border: 1px solid #999; }
+.print-doc .p-field span, .print-doc .p-grid span { display: block; font-size: 9px; color: #555; margin-bottom: 3px; }
+.print-doc .p-grid { margin-top: 10px; }
+.print-doc .p-grid td { border: 1px solid #999; padding: 8px 10px; vertical-align: top; width: 33%; }
+.print-doc.receipt p { margin-top: 10px; }
+.print-doc .p-box { display: inline-grid; place-items: center; width: 12px; height: 12px; border: 1px solid #333; font-size: 10px; line-height: 1; margin: 0 4px; vertical-align: -1px; }
+.print-doc .p-sign { margin: 40px 0 10px; }
+.print-doc .p-line { margin-top: 30px; padding-top: 4px; border-top: 1px solid #333; width: 70%; font-size: 9.5px; color: #444; }
+
+@media (max-width: 1100px) {
+  .type-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .type-grid, .type-grid.auth-types { grid-template-columns: 1fr; }
+  .module.sub { margin-left: 0; }
+  .system-teaser, .link-card, .timer-card { flex-wrap: wrap; }
+  .stepper li { font-size: 12px; }
+}

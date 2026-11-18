@@ -1,28 +1,37 @@
 # NEXCOUNT by Andrerer – Das Buchhaltungs- und Lagersystem für die Kleinen
 
-Web-App für kleine Unternehmen: Rechnungen, Angebote, Kassenbuch und – wenn man eins braucht –
-ein Lager. Mit Benutzeranmeldung, Teams und Echtzeit-Synchronisierung zwischen allen Geräten.
+Web-App für Selbstständige, Dienstleister, Kleinunternehmen und Vereine: Rechnungen, Angebote,
+Zeiterfassung, Mitglieder, Beiträge, Spenden, Kassenbuch – und als eigenes System **NEXCOUNT Lager**.
+Mit Benutzeranmeldung, Teams und Echtzeit-Synchronisierung zwischen allen Geräten.
 
-## Nur was du brauchst
+## Für jede Organisation das Richtige
 
-Beim ersten Start wählt der Admin eine Vorlage (Dienstleister, Handel, Handwerk, Nur Kassenbuch,
-Alles); danach lassen sich die Funktionen unter **Einstellungen → Funktionen** jederzeit
-an- und ausschalten. Ausgeschaltete Bereiche werden nur ausgeblendet, ihre Daten bleiben erhalten.
+Die Registrierung fragt in drei Schritten nach **Art der Organisation**, Name/Rechtsform/Steuerstatus
+und Zugang; danach führt ein Einrichtungsassistent durch Angaben und Funktionen.
 
-| Funktion               | Inhalt                                                             | benötigt           |
-|------------------------|--------------------------------------------------------------------|--------------------|
-| Kassenbuch             | Einnahmen & Ausgaben (immer aktiv)                                 | –                  |
-| Rechnungen             | Schreiben, drucken, Zahlung → Kassenbuch, Zahlungserinnerung       | Kontakte           |
-| Angebote               | Angebote erstellen, mit einem Klick in eine Rechnung umwandeln     | Rechnungen         |
-| Einkäufe               | Eingangsrechnungen von Lieferanten                                 | Kontakte           |
-| Kunden & Lieferanten   | Adressbuch mit Umsatz je Kontakt                                   | –                  |
-| Produkte & Leistungen  | Preisliste; Leistungen ohne Bestand                                | –                  |
-| Lagerverwaltung        | Bestände, Wareneingang/-ausgang, Inventur, Mindestbestand          | Produkte & Leist.  |
-| Berichte & Export      | EÜR, Umsatzsteuer, CSV/Backup                                      | –                  |
+| Art                               | Vorgeschlagene Funktionen                                                  |
+|-----------------------------------|-----------------------------------------------------------------------------|
+| Einzelunternehmer & Freiberufler  | Rechnungen, Angebote, Zeiterfassung, Kunden, Preisliste, Berichte           |
+| Dienstleistungsunternehmen        | wie oben + Einkäufe                                                         |
+| Kleinunternehmen & Handel         | Rechnungen, Angebote, Einkäufe, Kunden & Lieferanten, Preisliste, Berichte  |
+| Verein                            | Mitglieder, Beitragsläufe, Spenden mit Zuwendungsbestätigung, Kassenbericht |
 
-Bestand wird nur für **Produkte** geführt und nur, solange die Lagerverwaltung aktiv ist.
-Belege, die ohne aktives Lager festgeschrieben wurden, buchen nachträglich keinen Bestand –
-nach dem Einschalten des Lagers einmal eine Inventur machen.
+Je nach Art passen sich Begriffe, Kategorien, Übersicht und Berichte an (Verein: Kassenstand,
+Buchungen nach Sphären – ideell, Vermögensverwaltung, Zweckbetrieb, wirtschaftlicher Geschäftsbetrieb).
+Alle Funktionen lassen sich unter **Einstellungen → Funktionen** jederzeit an- und ausschalten;
+ausgeschaltete Bereiche werden nur ausgeblendet, ihre Daten bleiben erhalten.
+
+## NEXCOUNT Lager – eigenes System, optional verknüpft
+
+Das Lager hat einen eigenen Bereich (Umschalter „Buchhaltung | Lager“, eigene Farbe):
+Lager-Übersicht, Lagerartikel mit Lagerort und Mindestbestand, Bewegungen, Inventur, Inventurliste.
+
+- **Verknüpft:** Festgeschriebene Rechnungen buchen Ware ab, Einkäufe buchen zu, verkäufliche
+  Lagerartikel stehen in der Preisliste.
+- **Eigenständig:** Bestände ändern sich nur im Lager – z. B. Vereinsinventar, Material, Ausleihe.
+
+Belege, die ohne Verknüpfung festgeschrieben wurden, buchen nachträglich keinen Bestand –
+nach dem Verknüpfen einmal eine Inventur machen.
 
 | Teil              | Dienst                                                                  |
 |-------------------|-------------------------------------------------------------------------|
