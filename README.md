@@ -35,20 +35,25 @@ nach dem Einschalten des Lagers einmal eine Inventur machen.
 
 ```
 git push (main)
-   ├─ Cloudflare (mit dem Repo verbunden)  → npm run deploy → App live auf nexcount.andre5-noah.workers.dev
-   └─ .github/workflows/supabase.yml       → spielt neue Dateien aus supabase/migrations/ in Supabase ein
+   ├─ .github/workflows/deploy.yml    → prüft die Skripte, veröffentlicht zu Cloudflare → https://nexcount.andrerer.org
+   └─ .github/workflows/supabase.yml  → spielt neue Dateien aus supabase/migrations/ in Supabase ein
 ```
 
-- **App-Änderungen** (`public/…`): pushen → Cloudflare baut und veröffentlicht automatisch.
-  Cloudflare-Einstellungen: Build command *leer*, Deploy command `npm run deploy`, Branch `main`.
+- **App-Änderungen** (`public/…`): pushen → nach ca. 1 Minute live. Erfolg oder Fehler steht
+  auf GitHub im Reiter **Actions**.
 - **Datenbank-Änderungen**: neue Datei `supabase/migrations/<Zeitstempel>_<name>.sql` anlegen
   (z. B. `npx supabase migration new rechnungsnotizen`) → pushen → wird automatisch eingespielt.
   Bestehende Migrationen nie nachträglich ändern.
 
 ### Einmalige Einrichtung
 
-1. **Cloudflare mit GitHub verbinden:** *Workers & Pages → nexcount → Settings → Build →
-   Git repository* → `git-noah2026/nexcount`, Branch `main`, Deploy command `npm run deploy`.
+1. **Secrets für Cloudflare** (Repo → *Settings → Secrets and variables → Actions*):
+   - `CLOUDFLARE_API_TOKEN` – Cloudflare → *My Profile → API Tokens → Create Token* →
+     Vorlage **„Edit Cloudflare Workers“**
+   - `CLOUDFLARE_ACCOUNT_ID` – Cloudflare-Dashboard, Kontoübersicht („Account ID“)
+
+   Die Domain `nexcount.andrerer.org` ist im Cloudflare-Dashboard am Worker `nexcount` eingetragen
+   und bleibt bei jeder Veröffentlichung bestehen.
 2. **Secrets für Supabase** (Repo → *Settings → Secrets and variables → Actions → New repository secret*):
    - `SUPABASE_ACCESS_TOKEN` – in Supabase unter *Account → Access Tokens* erzeugen
    - `SUPABASE_DB_PASSWORD` – das beim Anlegen des Projekts erzeugte Datenbank-Passwort
@@ -56,8 +61,8 @@ git push (main)
    Ohne diese Secrets läuft die App trotzdem; nur das automatische Einspielen von
    Datenbank-Änderungen wird mit einem Hinweis übersprungen.
 3. **Supabase → Authentication → URL Configuration:** *Site URL*
-   `https://nexcount.andre5-noah.workers.dev` und unter *Redirect URLs*
-   `https://nexcount.andre5-noah.workers.dev/**` (für Bestätigungs- und Passwort-Mails – bereits eingerichtet).
+   `https://nexcount.andrerer.org` und unter *Redirect URLs* `https://nexcount.andrerer.org/**`
+   (für Bestätigungs- und Passwort-Mails).
 4. [`public/config.js`](public/config.js) enthält *Project URL* und *Publishable key* – beide sind
    öffentlich gedacht. Niemals den `secret`/`service_role` Key ins Repo schreiben!
 
