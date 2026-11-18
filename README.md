@@ -36,6 +36,25 @@ ausgeschaltete Bereiche werden nur ausgeblendet, ihre Daten bleiben erhalten.
 
 Die Angaben entsprechen dem Stand 2025 und ersetzen keine Steuerberatung.
 
+## Belege, Zahlungen & Mahnwesen
+
+- **Zahlungsziel:** Standard unter *Einstellungen → Belege*, je Kunde/Lieferant überschreibbar; Fälligkeit
+  wird aus Rechnungsdatum + Zahlungsziel berechnet. Eigener Text für die Zahlungsbedingungen mit Platzhaltern.
+- **Skonto:** z. B. 2 % in 7 Tagen – auf der Rechnung ausgewiesen, beim Zahlungseingang automatisch
+  vorgeschlagen. Gebucht wird nur der erhaltene Betrag (USt mindert sich anteilig).
+- **Zahlungen:** Teilzahlungen, Skonto/Nachlass, Zahlungsverlauf je Beleg, Zahlung wieder löschbar.
+- **Ausgangsrechnungen:** Kennzahlen (offen, überfällig, fällig in 7 Tagen, Zahlungseingänge), Statusfilter
+  mit Zählern (inkl. „mahnreif“), Filter nach Kunde/Jahr, Sortierung, Schnellaktionen je Zeile,
+  „versendet“-Markierung, E-Mail-Entwurf und vier Mahnstufen mit Mahnspesen.
+- **Eingangsrechnungen:** Rechnungsnr. des Lieferanten, Rechnungs-/Eingangs-/Leistungsdatum, Fälligkeit,
+  Lieferanten-Skonto („Skonto nutzbar“), Ausgabenkategorie und Ablageort.
+
+## Mein Konto
+
+Name, E-Mail-Adresse (mit Bestätigungslink) und Passwort (mit Prüfung des aktuellen) ändern, auf allen
+Geräten abmelden, Datenexport, Organisation verlassen, Organisation löschen und **Konto löschen**.
+Die drei letzten Funktionen brauchen die Migration `20261118200000_account.sql` (Workflow „Supabase-Datenbank“).
+
 ## NEXCOUNT Lager – eigenes System, optional verknüpft
 
 Das Lager hat einen eigenen Bereich (Umschalter „Buchhaltung | Lager“, eigene Farbe):

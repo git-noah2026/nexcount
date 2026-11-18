@@ -665,3 +665,33 @@ body[data-space="stock"] { --primary: #0d9488; --primary-hover: #0f766e; --prima
 @media (max-width: 600px) {
   .brand-logo img { height: 46px; margin-left: -10px; }
 }
+
+/* ---------- Belege: Statusfilter, Zahlungsbedingungen, Gefahrenzone */
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 16px; }
+.seg.chips { justify-self: start; max-width: 100%; }
+.seg.chips button { padding: 6px 11px; font-size: 13px; }
+.seg.chips .count { display: inline-block; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--surface-3); color: var(--muted); font-size: 11px; line-height: 18px; text-align: center; }
+.seg.chips button.active .count { background: var(--primary-soft); color: var(--primary); }
+td .sub.neg, .small.neg { color: var(--neg); }
+td .sub.pos { color: var(--pos); }
+.warn-text { color: var(--warn); }
+.nowrap { white-space: nowrap; }
+td.actions .icon-btn { width: 30px; height: 30px; }
+td.actions .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+fieldset.subsection { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px 10px; margin: 14px 0 12px; min-width: 0; }
+fieldset.subsection legend { padding: 0 6px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+section.subsection { margin-top: 16px; }
+section.subsection h4 { margin: 0 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+#terms-preview { margin-top: 8px; }
+.person .sub { display: block; font-size: 12px; color: var(--muted); }
+.danger-zone { border-color: color-mix(in srgb, var(--neg) 35%, var(--border)); }
+.danger-row { display: flex; align-items: center; gap: 14px; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--border); }
+.danger-row:first-child { border-top: 0; padding-top: 0; }
+.danger-row .sub { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.danger-row .btn { flex: none; }
+@media (max-width: 900px) { .grid4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) {
+  .grid4 { grid-template-columns: 1fr 1fr; }
+  .danger-row { flex-direction: column; align-items: stretch; }
+  .seg.chips { flex-wrap: nowrap; overflow-x: auto; }
+}

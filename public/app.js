@@ -67,15 +67,15 @@
   const DOC_STATUS = { draft: 'Entwurf', open: 'Offen', paid: 'Bezahlt', cancelled: 'Storniert', accepted: 'Angenommen', rejected: 'Abgelehnt' };
   const statusLabel = (d) => (d.kind === 'quote' && d.status === 'open' ? 'Versendet' : DOC_STATUS[d.status] || d.status);
   const DOC_KINDS = {
-    sale: { label: 'Rechnung', plural: 'Rechnungen', prefixKey: 'invoicePrefix', prefix: 'RE', module: 'invoices', contact: 'customer', icon: 'file' },
-    quote: { label: 'Angebot', plural: 'Angebote', prefixKey: 'quotePrefix', prefix: 'AN', module: 'quotes', contact: 'customer', icon: 'send' },
-    purchase: { label: 'Einkauf', plural: 'Einkäufe', prefixKey: 'purchasePrefix', prefix: 'EK', module: 'purchases', contact: 'supplier', icon: 'cart' },
+    sale: { label: 'Rechnung', plural: 'Rechnungen', newTitle: 'Neue Rechnung', prefixKey: 'invoicePrefix', prefix: 'RE', module: 'invoices', contact: 'customer', icon: 'file' },
+    quote: { label: 'Angebot', plural: 'Angebote', newTitle: 'Neues Angebot', prefixKey: 'quotePrefix', prefix: 'AN', module: 'quotes', contact: 'customer', icon: 'send' },
+    purchase: { label: 'Eingangsrechnung', plural: 'Eingangsrechnungen', newTitle: 'Eingangsrechnung erfassen', prefixKey: 'purchasePrefix', prefix: 'EK', module: 'purchases', contact: 'supplier', icon: 'cart' },
   };
   // Funktionen, die jede Organisation nach Bedarf ein- und ausschalten kann (Kassabuch ist immer aktiv)
   const MODULES = {
     invoices: { label: 'Rechnungen', icon: 'file', desc: 'Rechnungen schreiben, als PDF drucken, Zahlungseingänge automatisch ins Kassabuch buchen.', requires: ['contacts'] },
     quotes: { label: 'Angebote', icon: 'send', desc: 'Angebote erstellen und mit einem Klick in eine Rechnung umwandeln.', requires: ['invoices'] },
-    purchases: { label: 'Einkäufe', icon: 'cart', desc: 'Eingangsrechnungen von Lieferanten erfassen.', requires: ['contacts'] },
+    purchases: { label: 'Eingangsrechnungen', icon: 'cart', desc: 'Lieferantenrechnungen mit Fälligkeit, Skonto und Ablage erfassen und bezahlen.', requires: ['contacts'] },
     time: { label: 'Zeiterfassung', icon: 'clock', desc: 'Arbeitszeiten je Kunde und Projekt erfassen und mit einem Klick abrechnen.', requires: ['invoices'] },
     contacts: { label: 'Kunden & Lieferanten', icon: 'users', desc: 'Adressbuch mit Umsatzübersicht je Kontakt.' },
     catalog: { label: 'Produkte & Leistungen', icon: 'tag', desc: 'Deine Preisliste – Positionen mit einem Klick in Rechnungen und Angebote übernehmen.' },
@@ -155,6 +155,9 @@
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     minus: '<path d="M5 12h14"/>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+    trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+    key: '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 9.2-9.2M17 6l3 3M14 9l2 2"/>',
     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
     menu: '<path d="M3 6h18M3 12h18M3 18h18"/>',
     x: '<path d="M18 6L6 18M6 6l12 12"/>',
@@ -227,7 +230,8 @@
     if (res.error) {
       const msg = res.error.message || 'Unbekannter Fehler';
       if (isNetworkMsg(msg) || res.status === 0) throw offlineError();
-      const err = new Error(msg === 'NO_COMPANY' ? 'Du gehörst keiner Firma mehr an.' : msg);
+      const missingFn = res.error.code === 'PGRST202' || /could not find the function/i.test(msg);
+      const err = new Error(msg === 'NO_COMPANY' ? 'Du gehörst keiner Firma mehr an.' : missingFn ? 'Diese Funktion braucht ein Datenbank-Update (GitHub-Workflow „Supabase-Datenbank“).' : msg);
       if (msg === 'NO_COMPANY') err.noCompany = true;
       if (res.status === 401 || res.error.code === '28000' || /jwt|token/i.test(msg)) err.status = 401;
       throw err;
@@ -752,7 +756,7 @@
   const tracksStock = (a) => mod('inventory') && !!a && a.type !== 'service';
   // Belege buchen Bestände nur, wenn das Lager mit der Buchhaltung verknüpft ist
   const bookStock = (a) => stockLinked() && tracksStock(a);
-  const isLate = (d) => d.status === 'open' && d.kind !== 'purchase' && !!d.dueDate && d.dueDate < today();
+  const isLate = (d) => d.status === 'open' && !!d.dueDate && d.dueDate < today();
 
   function nextDocNumber(kind, date) {
     const K = DOC_KINDS[kind];
@@ -805,27 +809,118 @@
     }
     return put('documents', doc);
   }
-  function markDocPaid(doc, date, method) {
+  // ---------- Zahlungen, Zahlungsziel, Skonto und Mahnwesen
+  // Zahlungen liegen als Liste am Beleg (Teilzahlungen möglich). Ältere Belege ohne Liste gelten als voll bezahlt.
+  const daysDiff = (a, b) => Math.round((new Date(`${a}T12:00:00`) - new Date(`${b}T12:00:00`)) / 86400000);
+  const docPayments = (d) => (Array.isArray(d.payments) && d.payments.length ? d.payments
+    : d.status === 'paid' && d.paidAt ? [{ id: 'legacy', date: d.paidAt, amount: docTotals(d).gross, skonto: 0, method: '', entryId: d.entryId }] : []);
+  const paidSum = (d) => r2(sum(docPayments(d), (p) => num(p.amount) + num(p.skonto)));
+  const openAmount = (d) => (d.status === 'open' ? Math.max(0, r2(docTotals(d).gross - paidSum(d))) : 0);
+  const isPartial = (d) => d.status === 'open' && paidSum(d) > 0;
+  const REMINDER_LEVELS = ['Zahlungserinnerung', '1. Mahnung', '2. Mahnung', 'Letzte Mahnung'];
+  const lastReminder = (d) => (Array.isArray(d.reminders) && d.reminders.length ? d.reminders[d.reminders.length - 1] : null);
+  // Mahnreif: offen und seit mindestens „Karenztage“ überfällig (bzw. die letzte Mahnfrist ist abgelaufen)
+  const needsReminder = (d) => {
+    if (d.kind !== 'sale' || !isLate(d)) return false;
+    const last = lastReminder(d);
+    if (last) return !!last.deadline && last.deadline < today() && last.level < REMINDER_LEVELS.length - 1;
+    return daysDiff(today(), d.dueDate) >= num(settings().reminderGrace ?? 3);
+  };
+  // Skonto: x % bei Zahlung innerhalb von y Tagen ab Rechnungsdatum
+  const skontoInfo = (d) => {
+    const pct = num(d.skontoPercent);
+    const days = num(d.skontoDays);
+    if (pct <= 0 || days <= 0 || !d.date) return null;
+    const gross = docTotals(d).gross;
+    const amount = r2((gross * pct) / 100);
+    return { pct, days, until: addDays(d.date, days), amount, pay: r2(gross - amount) };
+  };
+  // Skonto noch nutzbar: offen, noch nichts bezahlt und die Frist läuft
+  const skontoOpen = (d) => { const k = skontoInfo(d); return !!k && d.status === 'open' && !paidSum(d) && k.until >= today(); };
+  // Zahlungsbedingungen: Kontakt überschreibt die Standardwerte aus den Einstellungen
+  function paymentTerms(contact, kind = 'sale') {
+    const s = settings();
+    const c = contact || {};
+    const has = (v) => v !== '' && v != null;
+    const own = kind !== 'purchase';
+    return {
+      days: has(c.paymentDays) ? num(c.paymentDays) : own ? num(s.paymentDays ?? 14) : 14,
+      skontoPercent: has(c.skontoPercent) ? num(c.skontoPercent) : own && s.skontoEnabled ? num(s.skontoPercent) : 0,
+      skontoDays: has(c.skontoDays) ? num(c.skontoDays) : own && s.skontoEnabled ? num(s.skontoDays) : 0,
+    };
+  }
+  // Text der Zahlungsbedingungen (auf Rechnung und in der Ansicht)
+  function paymentTermsText(d) {
+    const s = settings();
+    const k = skontoInfo(d);
+    const days = d.dueDate && d.date ? Math.max(0, daysDiff(d.dueDate, d.date)) : num(d.paymentDays);
+    const tpl = String(s.paymentTermsText || '').trim();
+    if (tpl) {
+      const map = { tage: days, faellig: fmtDate(d.dueDate), skonto: k ? `${fmtNum(k.pct)} %` : '', skontotage: k ? k.days : '', skontodatum: k ? fmtDate(k.until) : '', skontobetrag: k ? money(k.pay) : '', betrag: money(docTotals(d).gross) };
+      return tpl.replace(/\{(\w+)\}/g, (m, key) => (key.toLowerCase() in map ? String(map[key.toLowerCase()]) : m));
+    }
+    const base = !d.dueDate || days === 0 ? 'Zahlbar sofort ohne Abzug.' : `Zahlbar ohne Abzug bis ${fmtDate(d.dueDate)} (${days} Tage).`;
+    return k ? `${base} Bei Zahlung bis ${fmtDate(k.until)} abzüglich ${fmtNum(k.pct)} % Skonto (${money(k.amount)}): ${money(k.pay)}.` : base;
+  }
+
+  // Zahlung buchen: legt eine Einnahme/Ausgabe im Kassabuch an (USt anteilig – Skonto mindert so auch die Steuer)
+  function recordPayment(doc, { date, method, amount, skonto = 0, note = '' }) {
     const t = calcTotals(doc.items);
     const sale = doc.kind === 'sale';
-    const rate = t.rates.length === 1 ? t.rates[0].rate : null;
+    const open = openAmount(doc);
+    amount = r2(num(amount));
+    skonto = r2(Math.max(0, num(skonto)));
+    if (amount < 0) throw new Error('Der Betrag darf nicht negativ sein.');
+    if (amount + skonto <= 0) throw new Error('Bitte einen Betrag angeben.');
+    if (skonto > open + 0.005) throw new Error('Der Abzug ist höher als der offene Betrag.');
+    // Überzahlung nur in Höhe der Mahnspesen erlaubt (wird separat verbucht)
+    const fees = sale ? r2(sum(doc.reminders || [], (r) => num(r.fee)) - sum(docPayments(doc), (p) => num(p.extra))) : 0;
+    let applied = amount;
+    let extra = 0;
+    if (amount + skonto > open + 0.005) {
+      extra = r2(amount + skonto - open);
+      if (extra > fees + 0.005) throw new Error(`Der Betrag übersteigt den offenen Betrag von ${money(open)}${fees > 0 ? ` zzgl. ${money(fees)} Mahnspesen` : ''}.`);
+      applied = r2(amount - extra);
+    }
+    const name = (doc.contact && doc.contact.name) || '';
     const hasGoods = doc.items.some((it) => { const a = articleRaw(it.articleId); return a && a.type !== 'service'; });
-    const entry = put('entries', {
+    const ratio = t.gross ? applied / t.gross : 0;
+    const net = r2(t.net * ratio);
+    const entry = applied > 0 ? put('entries', {
       date,
       kind: sale ? 'income' : 'expense',
-      category: sale ? (hasGoods ? 'Warenerlöse' : 'Dienstleistungserlöse') : 'Wareneinkauf',
-      description: `${doc.number} · ${(doc.contact && doc.contact.name) || ''}`.trim(),
-      net: t.net, tax: t.tax, gross: t.gross, rate,
+      category: sale ? (hasGoods ? 'Warenerlöse' : 'Dienstleistungserlöse') : doc.category || 'Wareneinkauf',
+      description: `${doc.number}${skonto ? ` (abzgl. ${money(skonto)} Skonto)` : applied + skonto < open - 0.005 ? ' (Teilzahlung)' : ''} · ${name}`.trim(),
+      net, tax: r2(applied - net), gross: applied, rate: t.rates.length === 1 ? t.rates[0].rate : null,
       method, ref: doc.number, docId: doc.id,
-    });
-    return put('documents', { ...doc, status: 'paid', paidAt: date, entryId: entry.id });
+    }) : null;
+    const extraEntry = extra > 0 ? put('entries', {
+      date, kind: 'income', category: 'Sonstige Einnahmen', description: `Mahnspesen ${doc.number} · ${name}`.trim(),
+      net: extra, tax: 0, gross: extra, rate: 0, method, ref: doc.number, docId: doc.id,
+    }) : null;
+    const payments = [...docPayments(doc).filter((p) => p.id !== 'legacy'), { id: uid(), date, amount: applied, skonto, extra, method, note, entryId: entry ? entry.id : null, extraEntryId: extraEntry ? extraEntry.id : null }];
+    const full = r2(sum(payments, (p) => num(p.amount) + num(p.skonto))) >= t.gross - 0.005;
+    return put('documents', { ...doc, payments, status: full ? 'paid' : 'open', paidAt: full ? date : '', entryId: entry ? entry.id : doc.entryId || null });
+  }
+  // Rückwärtskompatibel: ganzen offenen Betrag als bezahlt buchen
+  function markDocPaid(doc, date, method) {
+    return recordPayment(doc, { date, method, amount: openAmount(doc) || calcTotals(doc.items).gross });
+  }
+  function deletePayment(doc, pid) {
+    const list = docPayments(doc);
+    const p = list.find((x) => x.id === pid);
+    if (!p) return doc;
+    for (const id of [p.entryId, p.extraEntryId]) if (id && get('entries', id)) del('entries', id);
+    const payments = list.filter((x) => x.id !== pid && x.id !== 'legacy');
+    return put('documents', { ...doc, payments, status: 'open', paidAt: '', entryId: payments.length ? payments[payments.length - 1].entryId : null });
   }
   function cancelDoc(doc) {
     for (const id of doc.movementIds || []) {
       const mv = get('movements', id);
       if (mv) put('movements', { articleId: mv.articleId, qty: -num(mv.qty), type: 'storno', date: today(), unitCost: mv.unitCost, docId: doc.id, note: `Storno ${doc.number}` });
     }
-    if (doc.entryId && get('entries', doc.entryId)) del('entries', doc.entryId);
+    const ids = new Set([doc.entryId, ...docPayments(doc).flatMap((p) => [p.entryId, p.extraEntryId])].filter(Boolean));
+    for (const id of ids) if (get('entries', id)) del('entries', id);
     return put('documents', { ...doc, status: 'cancelled', cancelledAt: Date.now(), entryId: null });
   }
   // Angebot → Rechnungsentwurf (Positionen, Kunde und Texte werden übernommen)
@@ -892,7 +987,7 @@
     if (mod('invoices')) items.push(['new-doc', 'sale', 'file', 'Rechnung']);
     if (mod('quotes')) items.push(['new-doc', 'quote', 'send', 'Angebot']);
     items.push(['new-entry', 'income', 'trendUp', 'Einnahme'], ['new-entry', 'expense', 'trendDown', 'Ausgabe']);
-    if (mod('purchases')) items.push(['new-doc', 'purchase', 'cart', 'Einkauf']);
+    if (mod('purchases')) items.push(['new-doc', 'purchase', 'cart', 'Eingangsrechnung']);
     if (mod('catalog')) items.push(['new-article', '', 'tag', 'Produkt / Leistung']);
     if (mod('contacts')) items.push(['new-contact', '', 'users', 'Kontakt']);
     return items;
@@ -1199,7 +1294,7 @@
         ${row('inventory', MODULES.inventory, !!mods.inventory, false, 'system')}
         ${mods.inventory ? `<label class="module sub ${linkOn ? 'on' : ''} ${readOnly ? 'ro' : ''}">
           <span class="module-ic">${icon('link', 18)}</span>
-          <span class="module-txt"><b>Mit der Buchhaltung verknüpfen</b><small>${linkOn ? 'Rechnungen buchen Ware ab, Einkäufe buchen zu, Lagerartikel stehen in der Preisliste.' : 'Das Lager läuft eigenständig – Belege verändern keine Bestände (z. B. für Material, Inventar, Ausleihe).'}</small></span>
+          <span class="module-txt"><b>Mit der Buchhaltung verknüpfen</b><small>${linkOn ? 'Rechnungen buchen Ware ab, Eingangsrechnungen buchen zu, Lagerartikel stehen in der Preisliste.' : 'Das Lager läuft eigenständig – Belege verändern keine Bestände (z. B. für Material, Inventar, Ausleihe).'}</small></span>
           <input type="checkbox" class="switch" data-link data-scope="${scope}" ${linkOn ? 'checked' : ''} ${readOnly ? 'disabled' : ''} aria-label="Lager verknüpfen">
         </label>` : ''}
       </div>`;
@@ -1586,7 +1681,7 @@
       <section class="link-card ${linked ? 'on' : ''}">
         <span class="module-ic">${icon(linked ? 'link' : 'layers', 18)}</span>
         <div><b>${linked ? 'Mit der Buchhaltung verknüpft' : 'Eigenständiges Lager'}</b>
-          <span>${linked ? 'Festgeschriebene Rechnungen buchen Ware ab, Einkäufe buchen zu, verkäufliche Lagerartikel stehen in der Preisliste.' : 'Bestände änderst du nur hier im Lager – Rechnungen und Einkäufe der Buchhaltung bleiben unberührt.'}</span></div>
+          <span>${linked ? 'Festgeschriebene Rechnungen buchen Ware ab, Eingangsrechnungen buchen zu, verkäufliche Lagerartikel stehen in der Preisliste.' : 'Bestände änderst du nur hier im Lager – Rechnungen und Eingangsrechnungen der Buchhaltung bleiben unberührt.'}</span></div>
         ${S.user.role === 'admin' ? `<label class="switch-label"><input type="checkbox" class="switch" data-link data-scope="settings" ${linked ? 'checked' : ''} aria-label="Mit Buchhaltung verknüpfen"><span>${linked ? 'Verknüpft' : 'Getrennt'}</span></label>` : ''}
       </section>
       <div class="kpis">
@@ -1774,65 +1869,149 @@
     render();
   }
 
-  // =============================================================== Ansicht: Belege (Rechnungen, Angebote, Einkäufe)
+  // =============================================================== Ansicht: Belege (Rechnungen, Angebote, Eingangsrechnungen)
   function docBadge(d) {
     if (isLate(d)) return `<span class="badge overdue">${d.kind === 'quote' ? 'Abgelaufen' : 'Überfällig'}</span>`;
+    if (isPartial(d)) return '<span class="badge warn">Teilbezahlt</span>';
     return `<span class="badge ${d.status}">${esc(statusLabel(d))}</span>`;
   }
+  // Fälligkeit relativ zu heute („in 5 T.“, „seit 3 T.“)
+  function dueRel(d) {
+    if (d.status !== 'open' || !d.dueDate) return '';
+    const n = daysDiff(d.dueDate, today());
+    if (n < 0) return `<span class="sub neg">seit ${-n} ${-n === 1 ? 'Tag' : 'Tagen'}</span>`;
+    if (n === 0) return '<span class="sub warn-text">heute fällig</span>';
+    return `<span class="sub">in ${n} ${n === 1 ? 'Tag' : 'Tagen'}</span>`;
+  }
+  const DOC_FILTERS = {
+    sale: [['', 'Alle'], ['draft', 'Entwürfe'], ['open', 'Offen'], ['late', 'Überfällig'], ['dun', 'Mahnreif'], ['partial', 'Teilbezahlt'], ['paid', 'Bezahlt'], ['cancelled', 'Storniert']],
+    quote: [['', 'Alle'], ['draft', 'Entwürfe'], ['open', 'Versendet'], ['late', 'Abgelaufen'], ['accepted', 'Angenommen'], ['rejected', 'Abgelehnt']],
+    purchase: [['', 'Alle'], ['draft', 'Entwürfe'], ['open', 'Offen'], ['late', 'Überfällig'], ['skonto', 'Skonto nutzbar'], ['partial', 'Teilbezahlt'], ['paid', 'Bezahlt'], ['cancelled', 'Storniert']],
+  };
+  const docMatch = (d, f) => (f === '' ? true : f === 'late' ? isLate(d) : f === 'partial' ? isPartial(d) : f === 'skonto' ? skontoOpen(d) : f === 'dun' ? needsReminder(d) : d.status === f);
 
   function viewDocuments() {
     const kinds = docKindsOn();
     const kind = kinds.includes(UI.q.docKind) ? UI.q.docKind : kinds[0];
     const K = DOC_KINDS[kind];
     const customer = K.contact === 'customer';
-    let docs = all('documents').filter((d) => d.kind === kind).sort((a, b) => byDateDesc(a, b) || String(b.number).localeCompare(String(a.number)));
-    const allKind = docs;
-    const stat = UI.q.docStatus || '';
-    if (stat === 'late') docs = docs.filter(isLate);
-    else if (stat) docs = docs.filter((d) => d.status === stat);
+    const allKind = all('documents').filter((d) => d.kind === kind);
+    const years = [...new Set(allKind.map((d) => String(d.date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+    // Filter: Jahr, Kontakt, Suche → Basis für Zähler; dann Status
+    let base = allKind;
+    if (UI.q.docYear) base = base.filter((d) => String(d.date || '').startsWith(UI.q.docYear));
+    if (UI.q.docContact) base = base.filter((d) => d.contactId === UI.q.docContact);
     const q = (UI.q.doc || '').toLowerCase();
-    if (q) docs = docs.filter((d) => [d.number, d.contact && d.contact.name, d.reference, ...(d.items || []).map((i) => i.text)].join(' ').toLowerCase().includes(q));
-    const statusOpts = {
-      sale: [['draft', 'Entwurf'], ['open', 'Offen'], ['late', 'Überfällig'], ['paid', 'Bezahlt'], ['cancelled', 'Storniert']],
-      quote: [['draft', 'Entwurf'], ['open', 'Versendet'], ['late', 'Abgelaufen'], ['accepted', 'Angenommen'], ['rejected', 'Abgelehnt']],
-      purchase: [['draft', 'Entwurf'], ['open', 'Offen'], ['paid', 'Bezahlt'], ['cancelled', 'Storniert']],
-    }[kind];
-    const openSum = sum(allKind.filter((d) => d.status === 'open'), (d) => docTotals(d).gross);
-    const dueHead = kind === 'sale' ? 'Fällig' : kind === 'quote' ? 'Gültig bis' : '';
+    if (q) base = base.filter((d) => [d.number, d.contact && d.contact.name, d.reference, d.filing, d.category, ...(d.items || []).map((i) => i.text)].join(' ').toLowerCase().includes(q));
+    const filters = DOC_FILTERS[kind];
+    const stat = filters.some(([v]) => v === UI.q.docStatus) ? UI.q.docStatus : '';
+    const sorters = {
+      date: (a, b) => byDateDesc(a, b) || String(b.number).localeCompare(String(a.number)),
+      due: (a, b) => String(a.dueDate || '9999').localeCompare(String(b.dueDate || '9999')),
+      amount: (a, b) => docTotals(b).gross - docTotals(a).gross,
+      contact: (a, b) => String((a.contact && a.contact.name) || '').localeCompare(String((b.contact && b.contact.name) || ''), 'de'),
+    };
+    const docs = base.filter((d) => docMatch(d, stat)).sort(sorters[UI.q.docSort] || sorters.date);
+    const contactOpts = [...new Map(allKind.filter((d) => d.contactId).map((d) => [d.contactId, (d.contact && d.contact.name) || '—'])).entries()].sort((a, b) => a[1].localeCompare(b[1], 'de'));
+
+    // Kennzahlen
+    const open = allKind.filter((d) => d.status === 'open');
+    const late = open.filter(isLate);
+    const soon = open.filter((d) => d.dueDate && d.dueDate >= today() && d.dueDate <= addDays(today(), 7));
+    const year = today().slice(0, 4);
+    const paidYear = r2(sum(allKind.flatMap((d) => (d.status === 'cancelled' ? [] : docPayments(d))).filter((p) => String(p.date).startsWith(year)), (p) => p.amount));
+    let kpis;
+    if (kind === 'quote') {
+      const decided = allKind.filter((d) => d.status === 'accepted' || d.status === 'rejected');
+      const rate = decided.length ? Math.round((100 * decided.filter((d) => d.status === 'accepted').length) / decided.length) : null;
+      kpis = kpi('Versendet', money(sum(open, (d) => docTotals(d).gross)), '', `${open.length} offen`, 'send')
+        + kpi('Abgelaufen', fmtNum(late.length), late.length ? 'neg' : '', 'Gültigkeit überschritten', 'alert')
+        + kpi('Annahmequote', rate == null ? '—' : `${rate} %`, 'pos', `${decided.length} entschieden`, 'check')
+        + kpi('Entwürfe', fmtNum(allKind.filter((d) => d.status === 'draft').length), '', 'noch nicht fertig', 'file');
+    } else {
+      const sk = open.filter(skontoOpen);
+      kpis = kpi(customer ? 'Offene Forderungen' : 'Offene Verbindlichkeiten', money(sum(open, openAmount)), '', `${open.length} ${open.length === 1 ? K.label : K.plural}`, customer ? 'file' : 'cart')
+        + kpi('Überfällig', money(sum(late, openAmount)), late.length ? 'neg' : 'pos', `${late.length} ${late.length === 1 ? 'Beleg' : 'Belege'}${customer && open.filter(needsReminder).length ? ` · ${open.filter(needsReminder).length} mahnreif` : ''}`, 'alert')
+        + kpi('Fällig in 7 Tagen', money(sum(soon, openAmount)), '', `${soon.length} ${soon.length === 1 ? 'Beleg' : 'Belege'}`, 'clock')
+        + (customer
+          ? kpi(`Zahlungseingänge ${year}`, money(paidYear), 'pos', 'inkl. Teilzahlungen', 'wallet')
+          : kpi('Skonto nutzbar', money(sum(sk, (d) => skontoInfo(d).amount)), sk.length ? 'pos' : '', sk.length ? `${sk.length} ${sk.length === 1 ? 'Beleg' : 'Belege'} · nächste Frist ${fmtDate(sk.map((d) => skontoInfo(d).until).sort()[0])}` : 'keine laufende Frist', 'wallet'));
+    }
+    const chips = filters.map(([v, l]) => {
+      const n = v === '' ? base.length : base.filter((d) => docMatch(d, v)).length;
+      if (v && !n && v !== stat && !['open', 'draft'].includes(v)) return '';
+      return `<button data-action="set-ui" data-k="docStatus" data-v="${v}" class="${v === stat ? 'active' : ''}">${esc(l)} <span class="count">${n}</span></button>`;
+    }).join('');
+    const rowActions = (d) => {
+      const b = (action, ic, title) => `<button class="icon-btn" data-action="${action}" data-id="${d.id}" title="${title}" aria-label="${title}">${icon(ic, 16)}</button>`;
+      let out = d.status !== 'draft' && kind !== 'purchase' ? b('doc-print', 'print', 'Drucken / PDF') : '';
+      if (d.status === 'open' && kind !== 'quote') out += b('doc-pay', 'check', 'Zahlung erfassen');
+      if (kind === 'sale' && isLate(d)) out += b('doc-remind', 'bell', 'Mahnen');
+      return out;
+    };
+    const head = kind === 'purchase'
+      ? '<th>Beleg</th><th>Rechnungsdatum</th><th>Lieferant</th><th>Kategorie</th><th>Fällig</th><th>Status</th><th class="num">Brutto</th><th class="num">Offen</th><th></th>'
+      : kind === 'quote'
+        ? '<th>Nummer</th><th>Datum</th><th>Kunde</th><th>Gültig bis</th><th>Status</th><th class="num">Netto</th><th class="num">Brutto</th><th></th>'
+        : '<th>Nummer</th><th>Datum</th><th>Kunde</th><th>Fällig</th><th>Status</th><th class="num">Brutto</th><th class="num">Offen</th><th></th>';
+    const rowHtml = (d) => {
+      const t = docTotals(d);
+      const k = skontoInfo(d);
+      const dueCell = d.status === 'paid' ? `<span class="muted">bezahlt ${fmtDate(d.paidAt)}</span>`
+        : `${fmtDate(d.dueDate) || '—'}${dueRel(d)}${k && skontoOpen(d) ? `<span class="sub pos">Skonto bis ${fmtDate(k.until)}</span>` : ''}`;
+      const rem = lastReminder(d);
+      const status = `${docBadge(d)}${rem && d.status === 'open' ? `<span class="sub">${esc(REMINDER_LEVELS[rem.level] || 'Mahnung')} ${fmtDate(rem.date)}</span>` : ''}${d.sentAt && d.status === 'open' && !rem ? `<span class="sub">versendet ${fmtDate(d.sentAt)}</span>` : ''}`;
+      const openCell = d.status === 'open' ? `<b>${money(openAmount(d))}</b>` : '<span class="muted">—</span>';
+      const cells = kind === 'purchase'
+        ? `<td><b>${esc(d.reference || d.number || 'Entwurf')}</b><span class="sub">${esc(d.number || 'Entwurf')}${d.filing ? ` · ${esc(d.filing)}` : ''}</span></td>
+          <td>${fmtDate(d.date)}${d.receivedAt && d.receivedAt !== d.date ? `<span class="sub">eingelangt ${fmtDate(d.receivedAt)}</span>` : ''}</td>
+          <td>${esc((d.contact && d.contact.name) || '—')}</td><td>${esc(d.category || 'Wareneinkauf')}</td>
+          <td>${dueCell}</td><td>${status}</td><td class="num">${money(t.gross)}</td><td class="num">${openCell}</td>`
+        : kind === 'quote'
+          ? `<td class="nowrap"><b>${esc(d.number || 'Entwurf')}</b>${d.reference ? `<span class="sub">${esc(d.reference)}</span>` : ''}</td><td>${fmtDate(d.date)}</td>
+            <td>${esc((d.contact && d.contact.name) || '—')}</td><td>${fmtDate(d.dueDate) || '—'}${dueRel(d)}</td><td>${status}</td>
+            <td class="num">${money(t.net)}</td><td class="num"><b>${money(t.gross)}</b></td>`
+          : `<td class="nowrap"><b>${esc(d.number || 'Entwurf')}</b>${d.reference ? `<span class="sub">${esc(d.reference)}</span>` : ''}</td><td>${fmtDate(d.date)}</td>
+            <td>${esc((d.contact && d.contact.name) || '—')}</td><td>${dueCell}</td><td>${status}</td>
+            <td class="num">${money(t.gross)}</td><td class="num">${openCell}</td>`;
+      return `<tr class="clickable" data-action="open-doc" data-id="${d.id}">${cells}<td class="actions nowrap">${rowActions(d)}</td></tr>`;
+    };
+    const cols = kind === 'purchase' ? 9 : 8;
+    const foot = kind === 'quote'
+      ? `<td colspan="5">${docs.length} ${docs.length === 1 ? K.label : K.plural}</td><td class="num">${money(sum(docs, (d) => docTotals(d).net))}</td><td class="num">${money(sum(docs, (d) => docTotals(d).gross))}</td><td></td>`
+      : `<td colspan="${cols - 3}">${docs.length} ${docs.length === 1 ? K.label : K.plural}</td><td class="num">${money(sum(docs, (d) => docTotals(d).gross))}</td><td class="num">${money(sum(docs, openAmount))}</td><td></td>`;
     return `
       ${kinds.length > 1 ? `<div class="seg tabs-seg">${kinds.map((k) => `<button data-action="set-ui" data-k="docKind" data-v="${k}" class="${k === kind ? 'active' : ''}">${icon(DOC_KINDS[k].icon, 16)} ${DOC_KINDS[k].plural}</button>`).join('')}</div>` : ''}
+      <div class="kpis">${kpis}</div>
+      <div class="seg chips">${chips}</div>
       <div class="toolbar">
-        ${searchBox('doc', 'Nummer, Kontakt, Position …')}
-        ${uiSelect('docStatus', [['', 'Alle Status'], ...statusOpts])}
-        <div class="actions"><button class="btn primary" data-action="new-doc" data-kind="${kind}">${icon('plus', 16)} ${K.label}</button></div>
+        ${searchBox('doc', kind === 'purchase' ? 'Rechnungsnr., Lieferant, Ablage …' : 'Nummer, Kunde, Position …')}
+        ${contactOpts.length > 1 ? uiSelect('docContact', [['', customer ? 'Alle Kunden' : 'Alle Lieferanten'], ...contactOpts]) : ''}
+        ${years.length > 1 ? uiSelect('docYear', [['', 'Alle Jahre'], ...years.map((y) => [y, y])]) : ''}
+        ${uiSelect('docSort', [['date', 'Neueste zuerst'], ['due', 'Nach Fälligkeit'], ['amount', 'Nach Betrag'], ['contact', customer ? 'Nach Kunde' : 'Nach Lieferant']])}
+        <div class="actions">
+          <button class="btn" data-action="export" data-what="documents" title="Belege als CSV">${icon('download', 16)}</button>
+          <button class="btn primary" data-action="new-doc" data-kind="${kind}">${icon('plus', 16)} ${K.label}</button>
+        </div>
       </div>
       <section class="card flush">
         ${docs.length ? `<div class="table-wrap"><table>
-          <thead><tr><th>Nummer</th><th>Datum</th><th>${customer ? 'Kunde' : 'Lieferant'}</th><th>Status</th>${dueHead ? `<th>${dueHead}</th>` : ''}<th class="num">Netto</th><th class="num">Brutto</th></tr></thead>
-          <tbody>${docs.map((d) => {
-            const t = docTotals(d);
-            const dueCell = kind === 'sale' && d.status === 'paid' ? `<span class="muted">bezahlt ${fmtDate(d.paidAt)}</span>` : fmtDate(d.dueDate);
-            return `<tr class="clickable" data-action="open-doc" data-id="${d.id}">
-              <td><b>${esc(d.number || 'Entwurf')}</b>${d.reference ? `<span class="sub">${esc(d.reference)}</span>` : ''}</td>
-              <td>${fmtDate(d.date)}</td>
-              <td>${esc((d.contact && d.contact.name) || '—')}</td>
-              <td>${docBadge(d)}</td>
-              ${dueHead ? `<td>${dueCell}</td>` : ''}
-              <td class="num">${money(t.net)}</td>
-              <td class="num"><b>${money(t.gross)}</b></td></tr>`;
-          }).join('')}</tbody>
-          <tfoot><tr><td colspan="${dueHead ? 5 : 4}">${docs.length} ${docs.length === 1 ? K.label : K.plural} · offen gesamt ${money(openSum)}</td><td class="num">${money(sum(docs, (d) => docTotals(d).net))}</td><td class="num">${money(sum(docs, (d) => docTotals(d).gross))}</td></tr></tfoot>
+          <thead><tr>${head}</tr></thead>
+          <tbody>${docs.map(rowHtml).join('')}</tbody>
+          <tfoot><tr>${foot}</tr></tfoot>
         </table></div>`
-        : empty(K.icon, allKind.length ? 'Nichts gefunden für diesen Filter.' : { sale: 'Noch keine Rechnungen geschrieben.', quote: 'Noch keine Angebote erstellt.', purchase: 'Noch keine Einkäufe erfasst.' }[kind],
-          allKind.length ? '' : `<button class="btn primary" data-action="new-doc" data-kind="${kind}">${icon('plus', 16)} ${K.label} erstellen</button>`)}
+        : empty(K.icon, allKind.length ? 'Nichts gefunden für diesen Filter.' : { sale: 'Noch keine Rechnungen geschrieben.', quote: 'Noch keine Angebote erstellt.', purchase: 'Noch keine Eingangsrechnungen erfasst.' }[kind],
+          allKind.length ? '' : `<button class="btn primary" data-action="new-doc" data-kind="${kind}">${icon('plus', 16)} ${K.label} ${kind === 'purchase' ? 'erfassen' : 'erstellen'}</button>`)}
       </section>`;
   }
 
-  function totalsHtml(t) {
+  function totalsHtml(t, d = null) {
+    const paid = d ? paidSum(d) : 0;
     return `<div class="totals">
       <div><span>Summe netto</span><span>${money(t.net)}</span></div>
       ${t.rates.map((r) => `<div class="muted"><span>USt ${r.rate} % auf ${money(r.net)}</span><span>${money(r.tax)}</span></div>`).join('')}
       <div class="grand"><span>Gesamt brutto</span><span>${money(t.gross)}</span></div>
+      ${d && paid > 0 && d.status !== 'cancelled' ? `<div class="muted"><span>Bezahlt / abgezogen</span><span>−${money(paid)}</span></div><div class="grand"><span>Offen</span><span>${money(openAmount(d))}</span></div>` : ''}
     </div>`;
   }
 
@@ -1846,13 +2025,16 @@
     const K = DOC_KINDS[kind];
     const customer = K.contact === 'customer';
     const isQuote = kind === 'quote';
-    const days = isQuote ? num(s.quoteDays) || 30 : num(s.paymentDays) || 14;
+    const purchase = kind === 'purchase';
+    const terms0 = paymentTerms(null, kind);
     const doc = existing ? JSON.parse(JSON.stringify(existing)) : {
-      id: uid(), kind, status: 'draft', date: today(),
-      dueDate: kind === 'purchase' ? '' : addDays(today(), days), items: [], contactId: '', reference: '', notes: '',
+      id: uid(), kind, status: 'draft', date: today(), items: [], contactId: '', reference: '', notes: '',
+      dueDate: isQuote ? addDays(today(), num(s.quoteDays) || 30) : addDays(today(), terms0.days),
+      paymentDays: isQuote ? '' : terms0.days, skontoPercent: isQuote ? '' : terms0.skontoPercent || '', skontoDays: isQuote ? '' : terms0.skontoDays || '',
+      ...(purchase ? { receivedAt: today(), category: 'Wareneinkauf' } : {}),
     };
     const useCatalog = mod('catalog') && articles().length > 0;
-    const newItem = () => ({ articleId: '', text: '', qty: 1, price: '', tax: smallBiz ? 0 : 20 });
+    const newItem = () => ({ articleId: '', text: '', qty: 1, price: '', tax: smallBiz && !purchase ? 0 : 20 });
     if (!doc.items.length) doc.items.push(newItem());
     const contacts = all('contacts').filter((c) => c.type === 'both' || c.type === K.contact).sort(byName);
 
@@ -1866,40 +2048,80 @@
       <td><button type="button" class="icon-btn" data-rm title="Position entfernen">${icon('x', 16)}</button></td>
     </tr>`;
 
-    const labels = {
-      sale: { date: 'Rechnungsdatum', due: 'Fällig am', ref: 'Referenz / Bestellnr. des Kunden', notes: 'Hinweis auf der Rechnung' },
-      quote: { date: 'Angebotsdatum', due: 'Gültig bis', ref: 'Betreff / Projekt', notes: 'Text auf dem Angebot' },
-      purchase: { date: 'Belegdatum', due: '', ref: 'Rechnungsnr. des Lieferanten', notes: 'Notiz' },
-    }[kind];
+    const contactSel = field(customer ? 'Kunde' : 'Lieferant', `<select name="contactId" ${customer ? 'required' : ''}><option value="">${customer ? 'Kunde wählen …' : '— ohne Lieferant —'}</option>${contacts.map((c) => `<option value="${c.id}" ${c.id === doc.contactId ? 'selected' : ''}>${esc(c.name)}${c.number ? ` (${esc(c.number)})` : ''}</option>`).join('')}</select>`);
+    const termsRow = isQuote ? '' : `<fieldset class="subsection"><legend>Zahlungsbedingungen</legend><div class="grid4">
+        ${field('Zahlungsziel (Tage)', numInp('paymentDays', doc.paymentDays ?? '', 'min="0" max="365" list="dl-days"'))}
+        ${field('Fällig am', inp('dueDate', doc.dueDate, 'type="date"'))}
+        ${field('Skonto (%)', numInp('skontoPercent', doc.skontoPercent || '', 'min="0" max="20" placeholder="—"'))}
+        ${field('Skonto-Frist (Tage)', numInp('skontoDays', doc.skontoDays || '', 'min="0" max="120" placeholder="—"'))}
+      </div><p class="muted small" id="terms-preview"></p>${datalist('dl-days', ['0', '7', '10', '14', '21', '30', '45', '60'])}</fieldset>`;
+    const header = purchase
+      ? `<div class="grid3">
+          ${contactSel}
+          ${field('Rechnungsnr. des Lieferanten', inp('reference', doc.reference, 'maxlength="60" required'))}
+          ${field('Kategorie (Ausgabe)', selectEl('category', catsFor('expense').map((c) => [c, c]), doc.category || 'Wareneinkauf'))}
+          ${field('Rechnungsdatum', inp('date', doc.date, 'type="date" required'))}
+          ${field('Eingangsdatum', inp('receivedAt', doc.receivedAt || today(), 'type="date"'))}
+          ${field('Leistungsdatum / -zeitraum', inp('serviceDate', doc.serviceDate, 'maxlength="40" placeholder="leer = Rechnungsdatum"'))}
+          ${field('Ablage / Belegnr. intern', inp('filing', doc.filing, 'maxlength="60" placeholder="z. B. Ordner 2026 · 017"'), 'span2')}
+          ${field('UID-Nr. des Lieferanten', `<input value="${esc((get('contacts', doc.contactId) || {}).vatId || '')}" readonly placeholder="aus dem Kontakt" id="sup-uid">`)}
+        </div>`
+      : `<div class="grid3">
+          ${contactSel}
+          ${field(isQuote ? 'Angebotsdatum' : 'Rechnungsdatum', inp('date', doc.date, 'type="date" required'))}
+          ${isQuote ? field('Gültig bis', inp('dueDate', doc.dueDate, 'type="date"')) : field('Leistungsdatum / -zeitraum', inp('serviceDate', doc.serviceDate, 'maxlength="40" placeholder="leer = Rechnungsdatum"'))}
+          ${field(isQuote ? 'Betreff / Projekt' : 'Referenz / Bestellnr. des Kunden', inp('reference', doc.reference, 'maxlength="80"'), 'span2')}
+          ${isQuote ? field('Leistungszeitraum (optional)', inp('serviceDate', doc.serviceDate, 'maxlength="40"')) : ''}
+        </div>`;
     const hint = isQuote
       ? 'Mit <b>Fertigstellen</b> erhält das Angebot eine Nummer und kann gedruckt werden. Nimmt der Kunde an, wandelst du es mit einem Klick in eine Rechnung um.'
-      : `Beim <b>Festschreiben</b> erhält der Beleg eine fortlaufende Nummer${mod('inventory') ? (kind === 'sale' ? ' und Produkte werden aus dem Lager gebucht' : ' und Produkte werden ins Lager eingebucht') : ''}. Danach sind nur noch Zahlung oder Storno möglich.`;
+      : `Beim <b>${purchase ? 'Erfassen' : 'Festschreiben'}</b> erhält der Beleg eine fortlaufende Nummer${mod('inventory') ? (kind === 'sale' ? ' und Produkte werden aus dem Lager gebucht' : ' und Produkte werden ins Lager eingebucht') : ''}. Danach sind nur noch Zahlung oder Storno möglich.`;
 
     openModal({
-      title: existing ? `${K.label} bearbeiten (Entwurf)` : `Neue${kind === 'sale' ? '' : 's'} ${K.label}`.replace('Neues Rechnung', 'Neue Rechnung').replace('Neues Einkauf', 'Neuer Einkauf'),
+      title: existing ? `${K.label} bearbeiten (Entwurf)` : K.newTitle,
       wide: true,
-      body: `<div class="grid3">
-          ${field(customer ? 'Kunde' : 'Lieferant', `<select name="contactId" ${customer ? 'required' : ''}><option value="">${customer ? 'Kunde wählen …' : '— ohne Lieferant —'}</option>${contacts.map((c) => `<option value="${c.id}" ${c.id === doc.contactId ? 'selected' : ''}>${esc(c.name)}${c.number ? ` (${esc(c.number)})` : ''}</option>`).join('')}</select>`)}
-          ${field(labels.date, inp('date', doc.date, 'type="date" required'))}
-          ${labels.due ? field(labels.due, inp('dueDate', doc.dueDate, 'type="date"')) : field(labels.ref, inp('reference', doc.reference, 'maxlength="60"'))}
-          ${labels.due ? field(labels.ref, inp('reference', doc.reference, 'maxlength="80"')) : ''}
-          ${customer ? field(kind === 'quote' ? 'Leistungszeitraum (optional)' : 'Leistungsdatum / -zeitraum', inp('serviceDate', doc.serviceDate, 'maxlength="40" placeholder="leer = Rechnungsdatum"')) : ''}
-        </div>
+      body: `${header}
         ${!contacts.length && customer ? '<div class="alert info">Noch keine Kunden vorhanden – lege sie zuerst unter <a href="#/contacts">Kontakte</a> an.</div>' : ''}
         <div class="table-wrap"><table class="items-table">
-          <thead><tr>${useCatalog ? `<th>${mod('inventory') ? 'Artikel' : 'Produkt / Leistung'}</th>` : ''}<th>Beschreibung</th><th class="num">Menge</th><th class="num">${kind === 'purchase' ? 'EK' : 'Preis'} netto</th><th>USt</th><th class="num">Summe</th><th></th></tr></thead>
+          <thead><tr>${useCatalog ? `<th>${mod('inventory') ? 'Artikel' : 'Produkt / Leistung'}</th>` : ''}<th>Beschreibung</th><th class="num">Menge</th><th class="num">${purchase ? 'EK' : 'Preis'} netto</th><th>USt</th><th class="num">Summe</th><th></th></tr></thead>
           <tbody id="doc-items"></tbody>
         </table></div>
         <div class="toolbar"><button type="button" class="btn sm" id="add-item">${icon('plus', 14)} Position</button><span class="spacer"></span><div id="doc-totals" style="flex:1"></div></div>
-        ${field(labels.notes, textarea('notes', doc.notes, 'maxlength="2000" rows="2"'))}
+        ${termsRow}
+        ${field({ sale: 'Hinweis auf der Rechnung', quote: 'Text auf dem Angebot', purchase: 'Notiz (intern)' }[kind], textarea('notes', doc.notes, 'maxlength="2000" rows="2"'))}
         <p class="muted small">${hint}</p>`,
       submit: 'Entwurf speichern',
-      extra: `${existing ? '<button type="button" class="btn danger" id="doc-delete">Entwurf löschen</button>' : ''}<button type="button" class="btn" id="doc-finalize">${icon('check', 16)} ${isQuote ? 'Fertigstellen' : 'Festschreiben'}</button>`,
+      extra: `${existing ? '<button type="button" class="btn danger" id="doc-delete">Entwurf löschen</button>' : ''}<button type="button" class="btn" id="doc-finalize">${icon('check', 16)} ${isQuote ? 'Fertigstellen' : purchase ? 'Erfassen' : 'Festschreiben'}</button>`,
       onMount(f) {
         const tbody = $('#doc-items', f);
-        const drawTotals = () => { $('#doc-totals', f).innerHTML = totalsHtml(calcTotals(doc.items)); };
+        const preview = () => {
+          const p = $('#terms-preview', f);
+          if (!p) return;
+          const d = { ...doc, date: f.elements.date.value, dueDate: f.elements.dueDate.value, skontoPercent: f.elements.skontoPercent.value, skontoDays: f.elements.skontoDays.value, updatedAt: Math.random() };
+          p.textContent = calcTotals(doc.items).gross > 0 ? paymentTermsText(d) : '';
+        };
+        const drawTotals = () => { $('#doc-totals', f).innerHTML = totalsHtml(calcTotals(doc.items)); preview(); };
         const draw = () => { tbody.innerHTML = doc.items.map(row).join(''); drawTotals(); };
         draw();
+        // Zahlungsziel ↔ Fälligkeit synchron halten
+        const syncDue = () => { if (f.elements.paymentDays && f.elements.paymentDays.value !== '' && f.elements.date.value) f.elements.dueDate.value = addDays(f.elements.date.value, num(f.elements.paymentDays.value)); preview(); };
+        if (f.elements.paymentDays) {
+          f.elements.paymentDays.addEventListener('input', syncDue);
+          f.elements.date.addEventListener('change', syncDue);
+          f.elements.dueDate.addEventListener('change', () => { if (f.elements.dueDate.value && f.elements.date.value) f.elements.paymentDays.value = Math.max(0, daysDiff(f.elements.dueDate.value, f.elements.date.value)); preview(); });
+          for (const n of ['skontoPercent', 'skontoDays']) f.elements[n].addEventListener('input', preview);
+        }
+        f.elements.contactId.addEventListener('change', () => {
+          const c = get('contacts', f.elements.contactId.value);
+          if (f.elements.paymentDays) {
+            const tm = paymentTerms(c, kind);
+            f.elements.paymentDays.value = tm.days;
+            f.elements.skontoPercent.value = tm.skontoPercent || '';
+            f.elements.skontoDays.value = tm.skontoDays || '';
+            syncDue();
+          }
+          if ($('#sup-uid', f)) $('#sup-uid', f).value = (c && c.vatId) || '';
+        });
         tbody.addEventListener('input', (e) => {
           const tr = e.target.closest('tr');
           const fName = e.target.dataset.f;
@@ -1910,8 +2132,8 @@
             const a = get('articles', it.articleId);
             if (a) {
               it.text = a.name;
-              it.price = kind === 'purchase' ? num(a.ek) : num(a.vk);
-              it.tax = smallBiz ? 0 : num(a.tax);
+              it.price = purchase ? num(a.ek) : num(a.vk);
+              it.tax = smallBiz && !purchase ? 0 : num(a.tax);
               it.unit = a.unit;
             }
             draw();
@@ -1934,12 +2156,12 @@
             const d = collect(f);
             if (!d.items.length) throw new Error('Bitte mindestens eine Position mit Beschreibung erfassen.');
             const msg = isQuote ? `Angebot über ${money(calcTotals(d.items).gross)} fertigstellen?`
-              : `${K.label} über ${money(calcTotals(d.items).gross)} festschreiben?${mod('inventory') ? ' Die Lagerbestände werden gebucht.' : ''}`;
+              : `${K.label} über ${money(calcTotals(d.items).gross)} ${purchase ? 'erfassen' : 'festschreiben'}?${mod('inventory') ? ' Die Lagerbestände werden gebucht.' : ''}`;
             if (!confirm(msg)) return;
             const saved = finalizeDoc(d);
             closeModal();
             render();
-            toast(`${saved.number} ${isQuote ? 'fertiggestellt' : 'festgeschrieben'}`, 'ok');
+            toast(`${saved.number} ${isQuote ? 'fertiggestellt' : purchase ? 'erfasst' : 'festgeschrieben'}`, 'ok');
             openDocView(saved);
           } catch (err) { toast(err.message, 'error'); }
         });
@@ -1963,66 +2185,123 @@
       const fd = Object.fromEntries(new FormData(f));
       if (customer && !fd.contactId) throw new Error('Bitte einen Kunden wählen.');
       const c = get('contacts', fd.contactId);
-      return {
+      const out = {
         ...doc,
         contactId: fd.contactId || '',
-        contact: c ? { name: c.name, contactPerson: c.contactPerson, street: c.street, zip: c.zip, city: c.city, country: c.country, vatId: c.vatId, number: c.number } : null,
+        contact: c ? { name: c.name, contactPerson: c.contactPerson, street: c.street, zip: c.zip, city: c.city, country: c.country, vatId: c.vatId, number: c.number, email: c.email } : null,
         date: fd.date,
-        dueDate: kind === 'purchase' ? '' : fd.dueDate,
+        dueDate: fd.dueDate || '',
         reference: (fd.reference || '').trim(),
-        serviceDate: customer ? (fd.serviceDate || '').trim() : '',
+        serviceDate: (fd.serviceDate || '').trim(),
         notes: fd.notes || '',
         items: doc.items
           .filter((it) => String(it.text || '').trim() || it.articleId)
           .map((it) => ({ articleId: it.articleId || '', text: String(it.text || '').trim(), qty: num(it.qty), price: num(it.price), tax: num(it.tax), unit: it.unit || (articleRaw(it.articleId) || {}).unit || '' })),
       };
+      if (!isQuote) {
+        out.paymentDays = fd.paymentDays === '' ? '' : num(fd.paymentDays);
+        out.skontoPercent = num(fd.skontoPercent) > 0 ? num(fd.skontoPercent) : '';
+        out.skontoDays = num(fd.skontoDays) > 0 ? num(fd.skontoDays) : '';
+        if (out.skontoPercent && !out.skontoDays) throw new Error('Bitte eine Skonto-Frist in Tagen angeben.');
+      }
+      if (purchase) {
+        out.receivedAt = fd.receivedAt || '';
+        out.category = fd.category || 'Wareneinkauf';
+        out.filing = (fd.filing || '').trim();
+      }
+      return out;
     }
   }
 
   function openDocView(doc) {
+    doc = get('documents', doc.id) || doc;
     const K = DOC_KINDS[doc.kind] || DOC_KINDS.sale;
     const customer = K.contact === 'customer';
     const t = calcTotals(doc.items);
     const late = isLate(doc);
     const linked = doc.invoiceId ? get('documents', doc.invoiceId) : null;
+    const contact = get('contacts', doc.contactId);
+    const email = (contact && contact.email) || (doc.contact && doc.contact.email) || '';
+    const k = skontoInfo(doc);
+    const pays = docPayments(doc);
+    const rems = doc.reminders || [];
     const btn = (id, ic, label, cls = '') => `<button type="button" class="btn ${cls}" id="${id}">${icon(ic, 16)} ${label}</button>`;
-    let actions = btn('dv-print', 'print', 'Drucken / PDF') + btn('dv-copy', 'copy', 'Kopie');
-    if (doc.kind === 'sale' && late) actions += btn('dv-remind', 'bell', 'Zahlungserinnerung');
+    let actions = btn('dv-print', 'print', doc.kind === 'purchase' ? 'Erfassungsbeleg' : 'Drucken / PDF') + btn('dv-copy', 'copy', 'Kopie');
+    if (doc.kind !== 'purchase' && email && doc.status !== 'cancelled') actions += btn('dv-mail', 'mail', 'E-Mail');
+    if (doc.kind !== 'purchase' && doc.status === 'open' && !doc.sentAt) actions += btn('dv-sent', 'send', 'Als versendet markieren');
+    if (doc.kind === 'sale' && late) actions += btn('dv-remind', 'bell', rems.length ? 'Nächste Mahnstufe' : 'Zahlungserinnerung');
     if (doc.kind === 'quote') {
       if (doc.status === 'open') actions += btn('dv-reject', 'x', 'Abgelehnt', 'danger');
       if (doc.status === 'open' && mod('invoices')) actions += btn('dv-convert', 'file', 'In Rechnung umwandeln', 'primary');
       if (linked) actions += btn('dv-linked', 'file', `Rechnung ${esc(linked.number || '(Entwurf)')} öffnen`);
     } else {
       if (doc.status === 'open' || doc.status === 'paid') actions += btn('dv-cancel', 'undo', 'Stornieren', 'danger');
-      if (doc.status === 'open') actions += btn('dv-paid', 'check', 'Als bezahlt markieren', 'primary');
+      if (doc.status === 'open') actions += btn('dv-paid', 'check', 'Zahlung erfassen', 'primary');
     }
+    const meta = [
+      ['Status', docBadge(doc)],
+      [customer ? 'Kunde' : 'Lieferant', `${esc((doc.contact && doc.contact.name) || '—')}${doc.contact && doc.contact.number ? ` <span class="muted small">${esc(doc.contact.number)}</span>` : ''}`],
+      [doc.kind === 'quote' ? 'Angebotsdatum' : 'Rechnungsdatum', fmtDate(doc.date)],
+      doc.kind === 'purchase' && doc.receivedAt ? ['Eingangsdatum', fmtDate(doc.receivedAt)] : null,
+      doc.kind !== 'quote' ? ['Leistungsdatum', esc(doc.serviceDate || 'wie Rechnungsdatum')] : null,
+      [doc.kind === 'quote' ? 'Gültig bis' : 'Fällig', `${fmtDate(doc.dueDate) || '—'}${doc.status === 'open' ? dueRel(doc).replace('class="sub', 'class="small') : ''}`],
+      k && doc.kind !== 'quote' ? ['Skonto', `${fmtNum(k.pct)} % bis ${fmtDate(k.until)} (${money(k.amount)})${skontoOpen(doc) ? ' <span class="badge ok">nutzbar</span>' : ''}`] : null,
+      doc.reference ? [doc.kind === 'purchase' ? 'Rechnungsnr. Lieferant' : 'Referenz', esc(doc.reference)] : null,
+      doc.kind === 'purchase' ? ['Kategorie', esc(doc.category || 'Wareneinkauf')] : null,
+      doc.filing ? ['Ablage', esc(doc.filing)] : null,
+      doc.sentAt ? ['Versendet am', fmtDate(doc.sentAt)] : null,
+      doc.paidAt ? ['Bezahlt am', fmtDate(doc.paidAt)] : null,
+      doc.status === 'open' && doc.kind !== 'quote' ? ['Offen', `<b>${money(openAmount(doc))}</b>`] : null,
+      doc.fromQuoteNumber ? ['Aus Angebot', esc(doc.fromQuoteNumber)] : null,
+    ].filter(Boolean);
+    const payTable = pays.length ? `<section class="subsection"><h4>Zahlungen</h4><div class="table-wrap"><table>
+        <thead><tr><th>Datum</th><th>Zahlungsart</th><th class="num">Betrag</th><th class="num">Skonto / Abzug</th><th></th></tr></thead>
+        <tbody>${pays.map((p) => `<tr><td>${fmtDate(p.date)}${p.note ? `<span class="sub">${esc(p.note)}</span>` : ''}</td><td>${esc(p.method || '—')}</td>
+          <td class="num">${money(num(p.amount) + num(p.extra))}${num(p.extra) ? `<span class="sub">inkl. ${money(p.extra)} Mahnspesen</span>` : ''}</td><td class="num">${num(p.skonto) ? money(p.skonto) : '—'}</td>
+          <td class="actions">${p.id !== 'legacy' && doc.status !== 'cancelled' ? `<button type="button" class="icon-btn" data-pdel="${p.id}" title="Zahlung löschen">${icon('x', 14)}</button>` : ''}</td></tr>`).join('')}</tbody>
+      </table></div></section>` : '';
+    const remTable = rems.length ? `<section class="subsection"><h4>Mahnverlauf</h4><div class="table-wrap"><table>
+        <thead><tr><th>Datum</th><th>Stufe</th><th>Neue Frist</th><th class="num">Mahnspesen</th><th></th></tr></thead>
+        <tbody>${rems.map((r, i) => `<tr><td>${fmtDate(r.date)}</td><td>${esc(REMINDER_LEVELS[r.level] || 'Mahnung')}</td><td>${fmtDate(r.deadline)}</td><td class="num">${num(r.fee) ? money(r.fee) : '—'}</td>
+          <td class="actions"><button type="button" class="icon-btn" data-rprint="${i}" title="Erneut drucken">${icon('print', 14)}</button></td></tr>`).join('')}</tbody>
+      </table></div></section>` : '';
     openModal({
       title: `${K.label} ${doc.number}`,
       wide: true,
-      body: `<div class="meta">
-          <div><span>Status</span><b>${docBadge(doc)}</b></div>
-          <div><span>${customer ? 'Kunde' : 'Lieferant'}</span><b>${esc((doc.contact && doc.contact.name) || '—')}</b></div>
-          <div><span>Datum</span><b>${fmtDate(doc.date)}</b></div>
-          ${doc.kind !== 'purchase' ? `<div><span>${doc.kind === 'quote' ? 'Gültig bis' : 'Fällig'}</span><b>${fmtDate(doc.dueDate) || '—'}</b></div>` : ''}
-          ${doc.reference ? `<div><span>Referenz</span><b>${esc(doc.reference)}</b></div>` : ''}
-          ${doc.paidAt ? `<div><span>Bezahlt am</span><b>${fmtDate(doc.paidAt)}</b></div>` : ''}
-          ${doc.fromQuoteNumber ? `<div><span>Aus Angebot</span><b>${esc(doc.fromQuoteNumber)}</b></div>` : ''}
-        </div>
+      body: `<div class="meta">${meta.map(([l, v]) => `<div><span>${l}</span><b>${v}</b></div>`).join('')}</div>
         <div class="table-wrap"><table>
           <thead><tr><th>Pos.</th><th>Beschreibung</th><th class="num">Menge</th><th class="num">Einzelpreis</th><th class="num">USt</th><th class="num">Summe netto</th></tr></thead>
           <tbody>${doc.items.map((it, i) => `<tr><td>${i + 1}</td><td>${esc(it.text)}${it.articleId ? `<span class="sub">${esc((articleRaw(it.articleId) || {}).sku || '')}</span>` : ''}</td><td class="num">${fmtNum(it.qty)} ${esc(it.unit || '')}</td><td class="num">${money(it.price)}</td><td class="num">${num(it.tax)} %</td><td class="num">${money(num(it.qty) * num(it.price))}</td></tr>`).join('')}</tbody>
         </table></div>
-        ${totalsHtml(t)}
+        ${totalsHtml(t, doc.kind === 'quote' ? null : doc)}
+        ${doc.kind === 'sale' && doc.status === 'open' ? `<p class="muted small">${esc(paymentTermsText(doc))}</p>` : ''}
+        ${payTable}${remTable}
         ${doc.notes ? `<div class="alert info">${esc(doc.notes)}</div>` : ''}`,
       extra: actions,
       onMount(f) {
         const on = (id, fn) => { const el = $(`#${id}`, f); if (el) el.addEventListener('click', fn); };
         on('dv-print', () => printDoc(doc));
-        on('dv-remind', () => printDoc(doc, { reminder: true }));
+        on('dv-remind', () => openReminder(doc));
+        on('dv-paid', () => openPayment(doc));
+        on('dv-mail', () => {
+          const s = settings();
+          const subj = `${K.label} ${doc.number} – ${s.name || companyName()}`;
+          const body = doc.kind === 'quote'
+            ? `Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie unser Angebot ${doc.number} über ${money(t.gross)}, gültig bis ${fmtDate(doc.dueDate)}.\n\nMit freundlichen Grüßen\n${S.user.name}\n${s.name || companyName()}`
+            : `Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie unsere Rechnung ${doc.number} vom ${fmtDate(doc.date)} über ${money(t.gross)}.\n${paymentTermsText(doc)}\n\nMit freundlichen Grüßen\n${S.user.name}\n${s.name || companyName()}`;
+          window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+          toast('Bitte das PDF (Drucken → Als PDF speichern) im E-Mail-Programm anhängen.');
+          if (doc.status === 'open' && !doc.sentAt) { put('documents', { ...get('documents', doc.id), sentAt: today() }); render(); }
+        });
+        on('dv-sent', () => { const d = put('documents', { ...get('documents', doc.id), sentAt: today() }); render(); openDocView(d); toast('Als versendet markiert', 'ok'); });
         on('dv-copy', () => {
           const s = settings();
-          const days = doc.kind === 'quote' ? num(s.quoteDays) || 30 : num(s.paymentDays) || 14;
-          const saved = put('documents', { kind: doc.kind, status: 'draft', date: today(), dueDate: doc.kind === 'purchase' ? '' : addDays(today(), days), contactId: doc.contactId, contact: doc.contact, items: JSON.parse(JSON.stringify(doc.items)), notes: doc.notes, reference: '' });
+          const days = doc.kind === 'quote' ? num(s.quoteDays) || 30 : doc.paymentDays !== '' && doc.paymentDays != null ? num(doc.paymentDays) : paymentTerms(contact, doc.kind).days;
+          const saved = put('documents', {
+            kind: doc.kind, status: 'draft', date: today(), dueDate: addDays(today(), days), contactId: doc.contactId, contact: doc.contact,
+            items: JSON.parse(JSON.stringify(doc.items)), notes: doc.notes, reference: '', paymentDays: doc.kind === 'quote' ? '' : days,
+            skontoPercent: doc.skontoPercent || '', skontoDays: doc.skontoDays || '', category: doc.category, receivedAt: doc.kind === 'purchase' ? today() : undefined,
+          });
           closeModal();
           render();
           openDoc(saved.id);
@@ -2043,51 +2322,138 @@
           toast(`${doc.number} als abgelehnt markiert`);
         });
         on('dv-cancel', () => {
-          if (!confirm(`${doc.number} stornieren?${(doc.movementIds || []).length ? ' Lagerbewegungen werden zurückgebucht.' : ''}${doc.status === 'paid' ? ' Die Zahlungsbuchung wird entfernt.' : ''}`)) return;
+          if (!confirm(`${doc.number} stornieren?${(doc.movementIds || []).length ? ' Lagerbewegungen werden zurückgebucht.' : ''}${pays.length ? ' Die Zahlungsbuchungen werden entfernt.' : ''}`)) return;
           cancelDoc(doc);
           closeModal();
           render();
           toast(`${doc.number} storniert`, 'ok');
         });
-        on('dv-paid', () => {
-          openModal({
-            title: `Zahlung erfassen · ${doc.number}`,
-            body: `<p>Betrag: <b>${money(t.gross)}</b> – es wird automatisch eine ${doc.kind === 'sale' ? 'Einnahme' : 'Ausgabe'} im Kassabuch erstellt.</p>
-              <div class="grid2">${field('Zahlungsdatum', inp('date', today(), 'type="date" required'))}${field('Zahlungsart', selectEl('method', METHODS.map((m) => [m, m]), 'Bank'))}</div>`,
-            submit: 'Zahlung buchen',
-            onSubmit(fd) {
-              markDocPaid(doc, fd.date, fd.method);
-              toast(`${doc.number} als bezahlt gebucht`, 'ok');
-            },
-          });
+        f.addEventListener('click', (e) => {
+          const pd = e.target.closest('[data-pdel]');
+          if (pd) {
+            if (!confirm('Diese Zahlung löschen? Die Buchung im Kassabuch wird ebenfalls entfernt.')) return;
+            const d = deletePayment(get('documents', doc.id), pd.dataset.pdel);
+            render();
+            openDocView(d);
+            toast('Zahlung gelöscht');
+            return;
+          }
+          const rp = e.target.closest('[data-rprint]');
+          if (rp) printDoc(doc, { reminder: rems[Number(rp.dataset.rprint)] });
         });
       },
     });
   }
 
-  function printDoc(doc, { reminder = false } = {}) {
+  // Zahlung erfassen (Teilzahlung, Skonto, Nachlass)
+  function openPayment(doc0) {
+    const doc = get('documents', doc0.id) || doc0;
+    const open = openAmount(doc);
+    const k = skontoInfo(doc);
+    const first = !paidSum(doc);
+    const sale = doc.kind === 'sale';
+    const suggest = (date) => (k && first && date <= k.until ? { amount: k.pay, skonto: k.amount } : { amount: open, skonto: 0 });
+    const s0 = suggest(today());
+    openModal({
+      title: `Zahlung erfassen · ${doc.number}`,
+      body: `<div class="meta"><div><span>Rechnungsbetrag</span><b>${money(docTotals(doc).gross)}</b></div><div><span>Offen</span><b>${money(open)}</b></div>
+          ${k ? `<div><span>Skonto</span><b>${fmtNum(k.pct)} % bis ${fmtDate(k.until)}</b></div>` : ''}</div>
+        <div class="grid2">
+          ${field('Zahlungsdatum', inp('date', today(), 'type="date" required'))}
+          ${field('Zahlungsart', selectEl('method', METHODS.map((m) => [m, m]), 'Bank'))}
+          ${field(sale ? 'Erhaltener Betrag (€)' : 'Bezahlter Betrag (€)', numInp('amount', s0.amount, 'min="0" required'))}
+          ${field('Skonto / Nachlass (€)', numInp('skonto', s0.skonto || '', 'min="0" placeholder="0,00"'))}
+          ${field('Notiz', inp('note', '', 'maxlength="120" placeholder="z. B. Kontoauszug 11/2026"'), 'span2')}
+        </div>
+        <p class="muted small" id="pay-info"></p>`,
+      submit: 'Zahlung buchen',
+      onMount(f) {
+        const info = () => {
+          const a = num(f.elements.amount.value);
+          const sk = num(f.elements.skonto.value);
+          const rest = r2(open - a - sk);
+          $('#pay-info', f).textContent = rest > 0.005 ? `Danach noch offen: ${money(rest)} (Teilzahlung).`
+            : rest < -0.005 ? `Überzahlung ${money(-rest)}${sale && (doc.reminders || []).some((r) => num(r.fee)) ? ' – wird als Mahnspesen verbucht.' : ' – bitte prüfen.'}`
+              : `Der Beleg ist damit vollständig ${sale ? 'bezahlt' : 'beglichen'}. Es wird eine ${sale ? 'Einnahme' : 'Ausgabe'} über ${money(a)} im Kassabuch gebucht.`;
+        };
+        f.elements.date.addEventListener('change', () => { const sg = suggest(f.elements.date.value); f.elements.amount.value = sg.amount; f.elements.skonto.value = sg.skonto || ''; info(); });
+        f.elements.amount.addEventListener('input', info);
+        f.elements.skonto.addEventListener('input', info);
+        info();
+      },
+      onSubmit(fd) {
+        const d = recordPayment(get('documents', doc.id), { date: fd.date, method: fd.method, amount: fd.amount, skonto: fd.skonto, note: fd.note.trim() });
+        toast(d.status === 'paid' ? `${d.number} ist bezahlt` : `Teilzahlung gebucht – offen ${money(openAmount(d))}`, 'ok');
+      },
+    });
+  }
+
+  // Zahlungserinnerung / Mahnung erstellen und drucken
+  function openReminder(doc0) {
+    const doc = get('documents', doc0.id) || doc0;
+    const s = settings();
+    const last = lastReminder(doc);
+    const level = last ? Math.min(REMINDER_LEVELS.length - 1, num(last.level) + 1) : 0;
+    openModal({
+      title: `Mahnen · ${doc.number}`,
+      body: `<div class="meta"><div><span>Offen</span><b>${money(openAmount(doc))}</b></div><div><span>Fällig seit</span><b>${fmtDate(doc.dueDate)} (${Math.max(0, daysDiff(today(), doc.dueDate))} Tage)</b></div>
+          ${last ? `<div><span>Letzte Stufe</span><b>${esc(REMINDER_LEVELS[last.level])} vom ${fmtDate(last.date)}</b></div>` : ''}</div>
+        <div class="grid3">
+          ${field('Stufe', selectEl('level', REMINDER_LEVELS.map((l, i) => [i, l]), level))}
+          ${field('Neue Zahlungsfrist', inp('deadline', addDays(today(), num(s.reminderDays ?? 7) || 7), 'type="date" required'))}
+          ${field('Mahnspesen (€)', numInp('fee', level === 0 ? '' : num(s.reminderFee) || '', 'min="0" placeholder="0,00"'))}
+        </div>
+        <p class="muted small">Die Mahnung wird im Verlauf der Rechnung gespeichert und gedruckt. Mahnspesen werden erst bei Zahlung als Einnahme gebucht.</p>`,
+      submit: 'Speichern & drucken',
+      onSubmit(fd) {
+        const r = { date: today(), level: num(fd.level), deadline: fd.deadline, fee: r2(num(fd.fee)) };
+        const d = put('documents', { ...get('documents', doc.id), reminders: [...(doc.reminders || []), r] });
+        printDoc(d, { reminder: r });
+        toast(`${REMINDER_LEVELS[r.level]} erstellt`, 'ok');
+      },
+    });
+  }
+
+  function printDoc(doc, { reminder = null } = {}) {
     const s = settings();
     const t = calcTotals(doc.items);
     const c = doc.contact || {};
     const customer = doc.kind !== 'purchase';
-    const title = reminder ? 'Zahlungserinnerung' : { sale: 'Rechnung', quote: 'Angebot', purchase: 'Einkaufsbeleg' }[doc.kind] || 'Beleg';
+    if (reminder === true) reminder = lastReminder(doc) || { level: 0, date: today(), deadline: addDays(today(), 7), fee: 0 };
+    const title = reminder ? REMINDER_LEVELS[reminder.level] || 'Mahnung' : { sale: 'Rechnung', quote: 'Angebot', purchase: 'Eingangsrechnung – Erfassungsbeleg' }[doc.kind] || 'Beleg';
     const firm = s.name || companyName();
     const sender = [firm, s.street, [s.zip, s.city].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
-    const dateLabel = { sale: 'Rechnungsdatum', quote: 'Angebotsdatum', purchase: 'Belegdatum' }[doc.kind];
+    const dateLabel = { sale: 'Rechnungsdatum', quote: 'Angebotsdatum', purchase: 'Rechnungsdatum' }[doc.kind];
+    const open = reminder ? openAmount(doc) || t.gross : 0;
+    const feesBefore = reminder ? r2(sum((doc.reminders || []).filter((r) => r !== reminder && r.date <= reminder.date), (r) => num(r.fee))) : 0;
     const meta = reminder
-      ? [`Datum: ${fmtDate(today())}`, `Rechnung ${esc(doc.number)} vom ${fmtDate(doc.date)}`, `fällig seit ${fmtDate(doc.dueDate)}`]
+      ? [`Datum: ${fmtDate(reminder.date)}`, `Rechnung ${esc(doc.number)} vom ${fmtDate(doc.date)}`, `fällig seit ${fmtDate(doc.dueDate)}`]
       : [`${dateLabel}: ${fmtDate(doc.date)}`,
         doc.kind === 'sale' ? `Leistungsdatum: ${doc.serviceDate ? esc(doc.serviceDate) : 'entspricht Rechnungsdatum'}` : '',
         doc.kind === 'quote' && doc.serviceDate ? `Leistungszeitraum: ${esc(doc.serviceDate)}` : '',
         doc.kind === 'sale' && doc.dueDate ? `Zahlbar bis: ${fmtDate(doc.dueDate)}` : '',
         doc.kind === 'quote' && doc.dueDate ? `Gültig bis: ${fmtDate(doc.dueDate)}` : '',
-        doc.reference ? `${doc.kind === 'quote' ? 'Betreff' : 'Referenz'}: ${esc(doc.reference)}` : ''];
-    if (c.number) meta.push(`Kunden-Nr.: ${esc(c.number)}`);
-    if (c.vatId) meta.push(`UID-Nr. Kunde: ${esc(c.vatId)}`);
-    const reminderText = reminder ? `<p style="margin-top:18px">Sehr geehrte Damen und Herren,</p>
-      <p>sicher ist es Ihrer Aufmerksamkeit entgangen: Unsere Rechnung <b>${esc(doc.number)}</b> vom ${fmtDate(doc.date)} über <b>${money(t.gross)}</b> war am ${fmtDate(doc.dueDate)} fällig.
-      Bitte überweisen Sie den offenen Betrag bis zum <b>${fmtDate(addDays(today(), 7))}</b>. Sollten Sie bereits bezahlt haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.</p>` : '';
+        doc.kind === 'purchase' && doc.receivedAt ? `Eingang: ${fmtDate(doc.receivedAt)}` : '',
+        doc.reference ? `${doc.kind === 'quote' ? 'Betreff' : doc.kind === 'purchase' ? 'Rechnungsnr. Lieferant' : 'Referenz'}: ${esc(doc.reference)}` : ''];
+    if (c.number) meta.push(`${customer ? 'Kunden' : 'Lieferanten'}-Nr.: ${esc(c.number)}`);
+    if (c.vatId) meta.push(`UID-Nr. ${customer ? 'Kunde' : 'Lieferant'}: ${esc(c.vatId)}`);
+    const reminderText = reminder ? (() => {
+      const fee = num(reminder.fee);
+      const total = r2(open + feesBefore + fee);
+      const intro = [
+        `sicher ist es Ihrer Aufmerksamkeit entgangen: Unsere Rechnung <b>${esc(doc.number)}</b> vom ${fmtDate(doc.date)} war am ${fmtDate(doc.dueDate)} fällig.`,
+        `leider konnten wir zu unserer Rechnung <b>${esc(doc.number)}</b> vom ${fmtDate(doc.date)} trotz Zahlungserinnerung noch keinen Zahlungseingang feststellen.`,
+        `trotz unserer bisherigen Mahnungen ist die Rechnung <b>${esc(doc.number)}</b> vom ${fmtDate(doc.date)} weiterhin offen.`,
+        `wir fordern Sie letztmalig auf, die Rechnung <b>${esc(doc.number)}</b> vom ${fmtDate(doc.date)} zu begleichen. Nach Ablauf der Frist übergeben wir die Forderung ohne weitere Ankündigung zur Eintreibung.`,
+      ][reminder.level] || '';
+      return `<p style="margin-top:18px">Sehr geehrte Damen und Herren,</p><p>${intro}</p>
+        <table class="p-grid" style="margin-top:10px"><tr><td><span>Offener Rechnungsbetrag</span><b>${money(open)}</b></td>
+          ${feesBefore + fee > 0 ? `<td><span>Mahnspesen</span><b>${money(feesBefore + fee)}</b></td>` : ''}
+          <td><span>Zu zahlen bis ${fmtDate(reminder.deadline)}</span><b>${money(total)}</b></td></tr></table>
+        <p>Bitte überweisen Sie den Betrag unter Angabe der Rechnungsnummer${s.iban ? ` auf unser Konto ${esc(s.iban)}` : ''}. Sollten Sie bereits bezahlt haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.</p>`;
+    })() : '';
     const footerText = reminder ? '' : doc.kind === 'quote' ? (s.quoteFooter || 'Wir freuen uns auf Ihren Auftrag.') : doc.kind === 'sale' ? (s.invoiceFooter || '') : '';
+    const paid = doc.kind === 'sale' && !reminder ? paidSum(doc) : 0;
     $('#print-root').innerHTML = `<div class="print-doc">
       <div class="p-head">
         <div>
@@ -2104,14 +2470,17 @@
           ${s.phone ? `<div>Tel. ${esc(s.phone)}</div>` : ''}${s.email ? `<div>${esc(s.email)}</div>` : ''}${s.website ? `<div>${esc(s.website)}</div>` : ''}
         </div>
       </div>
-      <h1>${title}${reminder ? '' : ` ${esc(doc.number)}`}</h1>
+      <h1>${esc(title)}${reminder || doc.kind === 'purchase' ? '' : ` ${esc(doc.number)}`}</h1>
       <div class="p-meta">${meta.filter(Boolean).join(' · ')}</div>
       ${reminderText}
-      <table><thead><tr><th>Pos.</th><th>Beschreibung</th><th class="num">Menge</th><th class="num">Einzelpreis</th><th class="num">USt</th><th class="num">Gesamt</th></tr></thead>
+      ${reminder ? '' : `<table><thead><tr><th>Pos.</th><th>Beschreibung</th><th class="num">Menge</th><th class="num">Einzelpreis</th><th class="num">USt</th><th class="num">Gesamt</th></tr></thead>
         <tbody>${doc.items.map((it, i) => `<tr><td>${i + 1}</td><td>${esc(it.text)}</td><td class="num">${fmtNum(it.qty)} ${esc(it.unit || '')}</td><td class="num">${money(it.price)}</td><td class="num">${num(it.tax)} %</td><td class="num">${money(num(it.qty) * num(it.price))}</td></tr>`).join('')}</tbody></table>
       ${totalsHtml(t)}
+      ${paid > 0 ? `<p style="margin-top:10px">Bereits bezahlt: ${money(paid)} · <b>Offener Betrag: ${money(openAmount(doc))}</b></p>` : ''}
+      ${doc.kind === 'sale' ? `<p style="margin-top:16px">${esc(paymentTermsText(doc))}</p>` : ''}
       ${s.smallBusiness && customer ? '<p style="margin-top:16px">Umsatzsteuerfrei aufgrund der Kleinunternehmerregelung gemäß § 6 Abs. 1 Z 27 UStG.</p>' : ''}
-      ${doc.notes && !reminder ? `<p style="margin-top:16px;white-space:pre-wrap">${esc(doc.notes)}</p>` : ''}
+      ${doc.kind === 'purchase' ? `<p style="margin-top:16px" class="p-small">Lieferant: ${esc(c.name || '—')} · Kategorie: ${esc(doc.category || 'Wareneinkauf')}${doc.filing ? ` · Ablage: ${esc(doc.filing)}` : ''} · intern ${esc(doc.number)}</p>` : ''}
+      ${doc.notes ? `<p style="margin-top:16px;white-space:pre-wrap">${esc(doc.notes)}</p>` : ''}`}
       ${footerText ? `<p style="margin-top:16px;white-space:pre-wrap">${esc(footerText)}</p>` : ''}
       <div class="p-foot">
         <div><b>${esc(firm)}</b>${s.legalForm && !String(firm).includes(s.legalForm.split(' ')[0]) && !/^(Einzelunternehmen|Neue Selbst)/.test(s.legalForm) ? ` · ${esc(s.legalForm.split(' (')[0])}` : ''}<br>${esc(s.street || '')}<br>${esc([s.zip, s.city].filter(Boolean).join(' '))}${s.fbNumber ? `<br>${esc(s.fbNumber)}` : ''}</div>
@@ -2833,6 +3202,11 @@
           ${field('Ort', inp('city', d.city, 'maxlength="80"'))}
           ${field('Land', inp('country', d.country, 'maxlength="60"'))}
           ${field('IBAN', inp('iban', d.iban, 'maxlength="40"'))}
+          <fieldset class="subsection span2"><legend>Zahlungsbedingungen <span class="muted small">(leer = Standard)</span></legend><div class="grid3">
+            ${field('Zahlungsziel (Tage)', numInp('paymentDays', d.paymentDays ?? '', `min="0" max="365" placeholder="${paymentTerms(null).days}"`))}
+            ${field('Skonto (%)', numInp('skontoPercent', d.skontoPercent ?? '', 'min="0" max="20" placeholder="—"'))}
+            ${field('Skonto-Frist (Tage)', numInp('skontoDays', d.skontoDays ?? '', 'min="0" max="120" placeholder="—"'))}
+          </div></fieldset>
           ${field('Notizen', textarea('notes', d.notes, 'maxlength="2000"'), 'span2')}
         </div>`,
       extra: c ? `<button type="button" class="btn danger" id="c-del">Löschen</button>` : '',
@@ -2849,6 +3223,8 @@
       onSubmit(fd) {
         const data = { ...(c || {}) };
         for (const k of ['type', 'number', 'name', 'contactPerson', 'email', 'phone', 'vatId', 'street', 'zip', 'city', 'country', 'iban', 'notes']) data[k] = String(fd[k] || '').trim();
+        for (const k of ['paymentDays', 'skontoPercent', 'skontoDays']) data[k] = fd[k] === '' || fd[k] == null ? '' : num(fd[k]);
+        if (data.skontoPercent && !data.skontoDays) throw new Error('Bitte eine Skonto-Frist in Tagen angeben.');
         if (!data.number) data.number = nextCode('contacts', data.type === 'supplier' ? 'L' : 'K', 'number');
         put('contacts', data);
         toast('Kontakt gespeichert', 'ok');
@@ -2966,7 +3342,7 @@
           <table><tbody>
             ${mod('invoices') ? `<tr><td>Forderungen (Rechnungen)</td><td class="num">${openSale.length}</td><td class="num">${money(sum(openSale, (d) => docTotals(d).gross))}</td></tr>
             <tr><td>davon überfällig</td><td class="num">${openSale.filter(isLate).length}</td><td class="num neg">${money(sum(openSale.filter(isLate), (d) => docTotals(d).gross))}</td></tr>` : ''}
-            ${mod('purchases') ? `<tr><td>Verbindlichkeiten (Einkäufe)</td><td class="num">${openPurch.length}</td><td class="num">${money(sum(openPurch, (d) => docTotals(d).gross))}</td></tr>` : ''}
+            ${mod('purchases') ? `<tr><td>Verbindlichkeiten (Eingangsrechnungen)</td><td class="num">${openPurch.length}</td><td class="num">${money(sum(openPurch, openAmount))}</td></tr>` : ''}
           </tbody></table>
         </section>` : ''}
       </div>
@@ -3036,8 +3412,8 @@
       downloadCsv(`nexcount-lagerbewegungen-${stamp}.csv`, ['Datum', 'Art.-Nr.', 'Artikel', 'Art', 'Menge', 'Einheit', 'EK je Einheit', 'Notiz', 'Erfasst von'],
         all('movements').sort((a, b) => String(a.date).localeCompare(String(b.date))).map((m) => { const a = articleRaw(m.articleId) || {}; return [fmtDate(m.date), a.sku, a.name, MV_TYPES[m.type], num(m.qty), a.unit, num(m.unitCost), m.note, m.createdBy]; }));
     } else if (what === 'documents') {
-      downloadCsv(`nexcount-belege-${stamp}.csv`, ['Nummer', 'Typ', 'Datum', 'Fällig', 'Kontakt', 'Status', 'Netto', 'USt', 'Brutto', 'Bezahlt am'],
-        all('documents').sort((a, b) => String(a.date).localeCompare(String(b.date))).map((d) => { const t = calcTotals(d.items); return [d.number || 'Entwurf', d.kind === 'sale' ? 'Rechnung' : 'Einkauf', fmtDate(d.date), fmtDate(d.dueDate), d.contact && d.contact.name, DOC_STATUS[d.status], t.net, t.tax, t.gross, fmtDate(d.paidAt)]; }));
+      downloadCsv(`nexcount-belege-${stamp}.csv`, ['Nummer', 'Typ', 'Datum', 'Fällig', 'Kontakt', 'Referenz', 'Status', 'Netto', 'USt', 'Brutto', 'Offen', 'Skonto abgezogen', 'Skonto-Bedingung', 'Mahnstufe', 'Bezahlt am', 'Kategorie', 'Ablage'],
+        all('documents').sort((a, b) => String(a.date).localeCompare(String(b.date))).map((d) => { const t = calcTotals(d.items); const k = skontoInfo(d); const r = lastReminder(d); return [d.number || 'Entwurf', (DOC_KINDS[d.kind] || {}).label || d.kind, fmtDate(d.date), fmtDate(d.dueDate), d.contact && d.contact.name, d.reference, isPartial(d) ? 'Teilbezahlt' : isLate(d) ? 'Überfällig' : DOC_STATUS[d.status], t.net, t.tax, t.gross, openAmount(d), r2(sum(docPayments(d), (p) => p.skonto)), k ? `${k.pct} % bis ${fmtDate(k.until)}` : '', r ? REMINDER_LEVELS[r.level] : '', fmtDate(d.paidAt), d.category || '', d.filing || '']; }));
     } else if (what === 'contacts') {
       downloadCsv(`nexcount-kontakte-${stamp}.csv`, ['Nr.', 'Typ', 'Name', 'Ansprechpartner', 'E-Mail', 'Telefon', 'Straße', 'PLZ', 'Ort', 'Land', 'UID-Nr.', 'IBAN'],
         all('contacts').sort(byName).map((c) => [c.number, CONTACT_TYPES[c.type], c.name, c.contactPerson, c.email, c.phone, c.street, c.zip, c.city, c.country, c.vatId, c.iban]));
@@ -3138,15 +3514,43 @@
 
   function settingsDocs() {
     const s = settings();
+    const sk = !!s.skontoEnabled;
+    const example = { id: 'beispiel', kind: 'sale', status: 'open', date: today(), dueDate: addDays(today(), num(s.paymentDays ?? 14)), items: [{ qty: 1, price: 1000, tax: 20 }], skontoPercent: sk ? num(s.skontoPercent) : '', skontoDays: sk ? num(s.skontoDays) : '', updatedAt: JSON.stringify(s).length };
     return `<form data-form="company" class="stack">
+      ${mod('invoices') || mod('purchases') ? `<section class="card">
+        <div class="card-head"><h3>Zahlungsziel</h3><span class="muted">Standard für neue Rechnungen – je Kunde überschreibbar</span></div>
+        <div class="grid3">
+          ${field('Zahlungsziel (Tage)', numInp('paymentDays', s.paymentDays ?? 14, 'min="0" max="365" list="dl-pdays"'))}
+          ${field('Erinnerung ab (Tage nach Fälligkeit)', numInp('reminderGrace', s.reminderGrace ?? 3, 'min="0" max="90"'))}
+          ${field('Neue Frist bei Mahnung (Tage)', numInp('reminderDays', s.reminderDays ?? 7, 'min="1" max="60"'))}
+          ${field('Mahnspesen ab 1. Mahnung (€)', numInp('reminderFee', s.reminderFee ?? '', 'min="0" placeholder="0,00"'))}
+        </div>
+        <div class="seg" style="margin-top:12px" aria-label="Schnellauswahl Zahlungsziel">${[0, 7, 14, 30, 45, 60].map((d) => `<button type="button" data-preset-days="${d}" class="${num(s.paymentDays ?? 14) === d ? 'active' : ''}">${d === 0 ? 'Sofort' : `${d} Tage`}</button>`).join('')}</div>
+        ${datalist('dl-pdays', ['0', '7', '10', '14', '21', '30', '45', '60'])}
+        <p class="muted small" style="margin-top:10px">Die Fälligkeit wird aus Rechnungsdatum + Zahlungsziel berechnet. „Mahnreif“ sind offene Rechnungen, die länger als die Erinnerungsfrist überfällig sind – Mahnstufen: Zahlungserinnerung, 1. Mahnung, 2. Mahnung, letzte Mahnung.</p>
+      </section>
       <section class="card">
-        <div class="card-head"><h3>Belege</h3><span class="muted">Nummernkreise, Fristen und Texte</span></div>
+        <div class="card-head"><h3>Skonto</h3><span class="muted">Nachlass bei schneller Zahlung</span></div>
+        <label class="check"><input type="checkbox" name="skontoEnabled" ${sk ? 'checked' : ''}> Skonto auf neuen Rechnungen standardmäßig anbieten</label>
+        <div class="grid3" style="margin-top:12px">
+          ${field('Skonto (%)', numInp('skontoPercent', s.skontoPercent ?? 2, 'min="0" max="20"'))}
+          ${field('Skonto-Frist (Tage ab Rechnungsdatum)', numInp('skontoDays', s.skontoDays ?? 7, 'min="1" max="120"'))}
+        </div>
+        <p class="muted small" style="margin-top:10px">Wird Skonto genutzt, bucht NEXCOUNT nur den tatsächlich erhaltenen Betrag; die Umsatzsteuer mindert sich anteilig. Skonto von Lieferanten trägst du im Lieferanten-Kontakt oder direkt auf der Eingangsrechnung ein.</p>
+      </section>
+      <section class="card">
+        <div class="card-head"><h3>Text der Zahlungsbedingungen</h3><span class="muted">optional</span></div>
+        ${field('Eigener Text (leer = automatisch)', textarea('paymentTermsText', s.paymentTermsText || '', 'maxlength="500" rows="2" placeholder="z. B. Zahlbar bis {faellig} ohne Abzug, bei Zahlung bis {skontodatum} mit {skonto} Skonto: {skontobetrag}."'))}
+        <p class="muted small" style="margin-top:6px">Platzhalter: {tage} · {faellig} · {betrag} · {skonto} · {skontotage} · {skontodatum} · {skontobetrag}</p>
+        <div class="alert info" style="margin-top:10px">Vorschau (1.200 € brutto): ${esc(paymentTermsText(example))}</div>
+      </section>` : ''}
+      <section class="card">
+        <div class="card-head"><h3>Nummernkreise & Texte</h3></div>
         <div class="grid3">
           ${mod('invoices') ? field('Präfix Rechnungen', inp('invoicePrefix', s.invoicePrefix || 'RE', 'maxlength="8" pattern="[A-Za-z0-9]+"')) : ''}
-          ${mod('invoices') ? field('Zahlungsziel (Tage)', numInp('paymentDays', s.paymentDays ?? 14, 'min="0" max="365"')) : ''}
           ${mod('quotes') ? field('Präfix Angebote', inp('quotePrefix', s.quotePrefix || 'AN', 'maxlength="8" pattern="[A-Za-z0-9]+"')) : ''}
           ${mod('quotes') ? field('Angebote gültig (Tage)', numInp('quoteDays', s.quoteDays ?? 30, 'min="1" max="365"')) : ''}
-          ${mod('purchases') ? field('Präfix Einkäufe', inp('purchasePrefix', s.purchasePrefix || 'EK', 'maxlength="8" pattern="[A-Za-z0-9]+"')) : ''}
+          ${mod('purchases') ? field('Präfix Eingangsrechnungen', inp('purchasePrefix', s.purchasePrefix || 'EK', 'maxlength="8" pattern="[A-Za-z0-9]+"')) : ''}
         </div>
         <div class="grid2" style="margin-top:12px">
           ${mod('invoices') ? field('Schlusstext auf Rechnungen', textarea('invoiceFooter', s.invoiceFooter ?? 'Vielen Dank für Ihren Auftrag! Bitte überweisen Sie den Betrag unter Angabe der Rechnungsnummer.', 'maxlength="1000" rows="3"')) : ''}
@@ -3189,29 +3593,135 @@
 
   function settingsAccount() {
     const admin = S.user.role === 'admin';
+    // Auth-Details (Konto seit, letzte Anmeldung, ausstehende E-Mail-Änderung) einmalig nachladen
+    if (!UI.authUser && !UI.authUserLoading) {
+      UI.authUserLoading = true;
+      sb.auth.getUser()
+        .then(({ data }) => { UI.authUser = (data && data.user) || {}; })
+        .catch(() => { UI.authUser = {}; })
+        .finally(() => { UI.authUserLoading = false; if (UI.route === 'settings' && !UI.formDirty) render(); });
+    }
+    const au = UI.authUser || {};
+    const soleAdmin = admin && S.members.filter((m) => m.role === 'admin').length <= 1;
+    const alone = admin && S.members.length <= 1;
     return `<div class="grid-2">
       <section class="card">
         <div class="card-head"><h3>Profil</h3><span class="badge ${admin ? 'info' : ''}">${admin ? 'Administrator' : 'Mitarbeiter'}</span></div>
+        <div class="person" style="margin-bottom:14px"><span class="avatar">${esc(initials(S.user.name))}</span><div><b>${esc(S.user.name)}</b><span class="sub">${esc(S.user.email)} · ${esc(companyName())}</span></div></div>
         <form data-form="profile" class="stack">
-          ${field('Name', inp('name', S.user.name, 'required maxlength="80"'))}
-          ${field('E-Mail', `<input value="${esc(S.user.email)}" readonly>`)}
+          ${field('Anzeigename', inp('name', S.user.name, 'required maxlength="80" autocomplete="name"'))}
           <div><button class="btn" type="submit">Name speichern</button></div>
+        </form>
+        <div class="meta" style="margin-top:14px">
+          <div><span>Konto seit</span><b>${au.created_at ? fmtDate(au.created_at) : '—'}</b></div>
+          <div><span>Letzte Anmeldung</span><b>${au.last_sign_in_at ? fmtTime(au.last_sign_in_at) : '—'}</b></div>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-head"><h3>E-Mail-Adresse</h3></div>
+        ${au.new_email ? `<div class="alert info" style="margin-bottom:12px">Änderung auf <b>${esc(au.new_email)}</b> ausstehend – bitte den Link in der Bestätigungsmail öffnen.</div>` : ''}
+        <form data-form="email" class="stack">
+          ${field('Aktuelle Adresse', `<input value="${esc(au.email || S.user.email)}" readonly>`)}
+          ${field('Neue Adresse', '<input name="newEmail" type="email" required maxlength="120" autocomplete="email">')}
+          <p class="muted small">Du erhältst einen Bestätigungslink. Erst danach meldest du dich mit der neuen Adresse an.</p>
+          <div><button class="btn" type="submit">${icon('mail', 16)} E-Mail ändern</button></div>
         </form>
       </section>
       <section class="card">
         <div class="card-head"><h3>Passwort ändern</h3></div>
         <form data-form="password" class="stack">
+          ${field('Aktuelles Passwort', '<input name="currentPassword" type="password" required autocomplete="current-password">')}
           ${field('Neues Passwort', '<input name="newPassword" type="password" required minlength="8" autocomplete="new-password">')}
           ${field('Neues Passwort wiederholen', '<input name="newPassword2" type="password" required minlength="8" autocomplete="new-password">')}
-          <div><button class="btn" type="submit">Passwort ändern</button></div>
+          <p class="muted small">Mindestens 8 Zeichen – am besten eine Passphrase aus mehreren Wörtern.</p>
+          <div><button class="btn" type="submit">${icon('key', 16)} Passwort ändern</button></div>
         </form>
       </section>
       <section class="card">
-        <div class="card-head"><h3>Abmelden</h3></div>
-        <p class="muted small" style="margin-bottom:12px">Beim Abmelden werden die lokal gespeicherten Daten auf diesem Gerät gelöscht.</p>
-        <button class="btn danger" data-action="logout">${icon('logout', 16)} Abmelden</button>
+        <div class="card-head"><h3>Sitzungen</h3></div>
+        <p class="muted small" style="margin-bottom:12px">Beim Abmelden werden die lokal gespeicherten Daten auf diesem Gerät gelöscht. „Überall abmelden“ beendet auch die Sitzungen auf anderen Geräten (z. B. nach Verlust eines Handys).</p>
+        <div class="toolbar">
+          <button class="btn" data-action="logout">${icon('logout', 16)} Abmelden</button>
+          <button class="btn" data-action="logout-all">${icon('shield', 16)} Auf allen Geräten abmelden</button>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-head"><h3>Meine Daten</h3></div>
+        <p class="muted small" style="margin-bottom:12px">Lade alle Daten von ${esc(companyName())} als JSON-Datei herunter – z. B. als Sicherung oder vor dem Löschen des Kontos.</p>
+        <button class="btn" data-action="export" data-what="backup">${icon('download', 16)} Datenexport (JSON)</button>
+      </section>
+      <section class="card danger-zone">
+        <div class="card-head"><h3>Gefahrenzone</h3></div>
+        <div class="stack">
+          ${alone ? '' : `<div class="danger-row"><div><b>Organisation verlassen</b><span class="sub">Du verlierst den Zugriff auf ${esc(companyName())}. Die Daten bleiben für das Team erhalten.${soleAdmin ? ' Als einziger Administrator musst du vorher jemand anderen zum Admin machen.' : ''}</span></div>
+            <button class="btn danger" data-action="leave-company">Verlassen</button></div>`}
+          ${admin ? `<div class="danger-row"><div><b>Organisation löschen</b><span class="sub">Löscht ${esc(companyName())} mit allen Belegen, Buchungen und Kontakten ${S.members.length > 1 ? `für alle ${S.members.length} Zugänge` : 'für dich'}. Nicht umkehrbar.</span></div>
+            <button class="btn danger" data-action="delete-company">Organisation löschen</button></div>` : ''}
+          <div class="danger-row"><div><b>Konto löschen</b><span class="sub">Löscht deinen Zugang dauerhaft.${alone ? ' Da du die einzige Person bist, wird auch die Organisation mit allen Daten gelöscht.' : ' Die Daten der Organisation bleiben für das Team erhalten.'}</span></div>
+            <button class="btn danger" data-action="delete-account">${icon('trash', 16)} Konto löschen</button></div>
+        </div>
+        <p class="muted small" style="margin-top:12px">Hinweis: Buchhaltungsunterlagen sind in Österreich in der Regel 7 Jahre aufzubewahren (§ 132 BAO). Exportiere deine Daten, bevor du löschst.</p>
       </section>
     </div>`;
+  }
+
+  // Lokale Daten entfernen und zur Anmeldung zurück (nach Konto-/Organisationslöschung)
+  async function endSession(message, scope = 'local') {
+    disconnectEvents();
+    if (S.user) safeLS.del(lsKey());
+    safeLS.del('nexcount:last');
+    Object.assign(S, { user: null, company: null, members: [], db: {}, seq: 0, pending: [], lastSync: 0 });
+    S.ver++;
+    UI.authUser = null;
+    closeModal();
+    try { await sb.auth.signOut({ scope }); } catch { /* offline egal */ }
+    authTab = 'login';
+    renderAuth(message);
+  }
+
+  // Bestätigungsdialog mit Eingabe (z. B. E-Mail oder Firmenname), bevor etwas Endgültiges passiert
+  function confirmTyped({ title, text, expect, label, button, run }) {
+    openModal({
+      title,
+      body: `<div class="alert warn">${text}</div>
+        ${field(label, `<input name="confirmText" required autocomplete="off" placeholder="${esc(expect)}">`)}
+        <label class="check" style="margin-top:10px"><input type="checkbox" name="ack" required> Mir ist bewusst, dass das nicht rückgängig gemacht werden kann.</label>`,
+      submit: button,
+      onSubmit(fd, f) {
+        if (String(fd.confirmText).trim().toLowerCase() !== String(expect).trim().toLowerCase()) throw new Error('Die Eingabe stimmt nicht überein.');
+        const btn = $('button[type=submit]', f);
+        btn.disabled = true;
+        run(String(fd.confirmText).trim())
+          .catch((err) => { btn.disabled = false; toast(err.message, 'error'); });
+        return false;
+      },
+    });
+  }
+  function deleteAccount() {
+    if (!navigator.onLine) return toast('Zum Löschen des Kontos wird eine Internetverbindung benötigt.', 'error');
+    confirmTyped({
+      title: 'Konto endgültig löschen',
+      text: `Dein Zugang <b>${esc(S.user.email)}</b> wird dauerhaft gelöscht.${S.user.role === 'admin' && S.members.length <= 1 ? ` Da du die einzige Person bist, wird auch <b>${esc(companyName())}</b> mit allen Daten gelöscht.` : ''}`,
+      expect: S.user.email, label: 'Zur Bestätigung deine E-Mail-Adresse eingeben', button: 'Konto löschen',
+      run: async (txt) => { await rpc('delete_account', { p_confirm: txt }); await endSession('Dein Konto wurde gelöscht. Danke, dass du NEXCOUNT genutzt hast.'); },
+    });
+  }
+  function deleteCompany() {
+    if (!navigator.onLine) return toast('Dafür wird eine Internetverbindung benötigt.', 'error');
+    confirmTyped({
+      title: 'Organisation endgültig löschen',
+      text: `<b>${esc(companyName())}</b> wird mit allen Belegen, Buchungen, Kontakten und Einstellungen gelöscht – ${S.members.length > 1 ? `für alle ${S.members.length} Zugänge` : 'für dich'}. Dein Konto bleibt bestehen.`,
+      expect: companyName(), label: 'Zur Bestätigung den Namen der Organisation eingeben', button: 'Organisation löschen',
+      run: async (txt) => { await rpc('delete_company', { p_confirm: txt }); lostCompany(); toast('Organisation gelöscht', 'ok'); },
+    });
+  }
+  async function leaveCompany() {
+    if (!confirm(`${companyName()} wirklich verlassen? Du verlierst den Zugriff auf alle Daten der Organisation.`)) return;
+    try { await rpc('leave_company'); lostCompany(); } catch (err) { toast(err.message, 'error'); }
+  }
+  async function logoutAll() {
+    if (!confirm('Auf allen Geräten abmelden? Nicht synchronisierte Änderungen auf diesem Gerät gehen verloren.')) return;
+    await endSession('Du wurdest auf allen Geräten abgemeldet.', 'global');
   }
 
   function settingsSystem() {
@@ -3422,7 +3932,8 @@
       const before = settings();
       const data = { ...before, id: 'company' };
       for (const [k, v] of Object.entries(fd)) data[k] = typeof v === 'string' ? v.trim() : v;
-      if ('paymentDays' in fd) data.paymentDays = num(fd.paymentDays);
+      for (const k of ['paymentDays', 'reminderGrace', 'reminderDays', 'reminderFee', 'skontoPercent', 'skontoDays']) if (k in fd) data[k] = num(fd[k]);
+      if (f.elements.skontoEnabled) data.skontoEnabled = fd.skontoEnabled === 'on';
       if ('quoteDays' in fd) data.quoteDays = num(fd.quoteDays);
       if ('hourlyRate' in fd) data.hourlyRate = num(fd.hourlyRate);
       // Checkboxen nur auswerten, wenn sie in diesem Formular vorkommen
@@ -3450,8 +3961,21 @@
       toast('Name gespeichert', 'ok');
       refreshMe();
     },
+    async email(fd, f) {
+      const email = String(fd.newEmail || '').trim().toLowerCase();
+      if (!email || email === String(S.user.email).toLowerCase()) throw new Error('Bitte eine neue E-Mail-Adresse eingeben.');
+      const { error } = await sb.auth.updateUser({ email });
+      if (error) throw new Error(authMessage(error));
+      f.reset();
+      UI.authUser = null;
+      toast(`Bestätigungslink an ${email} gesendet`, 'ok');
+      render();
+    },
     async password(fd, f) {
       if (fd.newPassword !== fd.newPassword2) throw new Error('Die Passwörter stimmen nicht überein.');
+      if (fd.newPassword === fd.currentPassword) throw new Error('Das neue Passwort muss sich vom aktuellen unterscheiden.');
+      const check = await sb.auth.signInWithPassword({ email: S.user.email, password: fd.currentPassword });
+      if (check.error) throw new Error('Das aktuelle Passwort ist nicht korrekt.');
       const { error } = await sb.auth.updateUser({ password: fd.newPassword });
       if (error) throw new Error(authMessage(error));
       f.reset();
@@ -3464,6 +3988,13 @@
     'toggle-menu': () => $('#shell').classList.toggle('menu-open'),
     'sync-now': () => { if (!S.online) toast('Keine Verbindung – Änderungen werden später übertragen.'); sync(); },
     logout,
+    'logout-all': () => logoutAll(),
+    'leave-company': () => leaveCompany(),
+    'delete-account': () => deleteAccount(),
+    'delete-company': () => deleteCompany(),
+    'doc-print': (el) => { const d = get('documents', el.dataset.id); if (d) printDoc(d); },
+    'doc-pay': (el) => { const d = get('documents', el.dataset.id); if (d) openPayment(d); },
+    'doc-remind': (el) => { const d = get('documents', el.dataset.id); if (d) openReminder(d); },
     'auth-tab': (el) => {
       const email = $('.auth-panel input[name=email]');
       if (email && email.value) authEmail = email.value;
@@ -3643,6 +4174,13 @@
 
   // =============================================================== Globale Events
   document.addEventListener('click', (e) => {
+    const pd = e.target.closest('[data-preset-days]');
+    if (pd) {
+      const f = pd.closest('form');
+      if (f && f.elements.paymentDays) { f.elements.paymentDays.value = pd.dataset.presetDays; UI.formDirty = true; }
+      $$('[data-preset-days]', pd.parentElement).forEach((b) => b.classList.toggle('active', b === pd));
+      return;
+    }
     const el = e.target.closest('[data-action]');
     // offene Menüs schließen, wenn außerhalb geklickt wird
     const qm = $('#quick-menu');
