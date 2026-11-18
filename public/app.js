@@ -1128,7 +1128,7 @@
   function authShell(inner) {
     $('#app').innerHTML = `<div class="auth">
       <div class="auth-panel">
-        <div class="brand big"><img src="icon.svg" alt=""><div><div class="brand-name">NEXCOUNT</div><div class="brand-sub">by Andrerer</div></div></div>
+        <div class="brand-logo"><img class="logo-light" src="logo.svg" alt="NEXCOUNT by Andrerer"><img class="logo-dark" src="logo-dark.svg" alt="NEXCOUNT by Andrerer"></div>
         ${inner}
       </div>
       <div class="auth-hero">

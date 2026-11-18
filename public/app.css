@@ -1,20 +1,27 @@
 /* NEXCOUNT by Andrerer – Das Buchhaltungs- und Lagersystem für die Kleinen */
 :root {
-  --bg: #f4f5f9;
+  /* Markenfarben aus dem Logo: Himmelblau #38BDF8, Marineblau #0F172A, Cyan #22D3EE */
+  --brand-sky: #38bdf8;
+  --brand-navy: #0f172a;
+  --brand-cyan: #22d3ee;
+  --bg: #f4f7fb;
   --surface: #ffffff;
-  --surface-2: #f3f4f8;
-  --surface-3: #e9ebf2;
-  --border: #e3e6ee;
-  --border-strong: #d3d7e3;
-  --text: #111522;
-  --text-2: #3a4157;
-  --muted: #6b7289;
-  --primary: #4f46e5;
-  --primary-hover: #4338ca;
+  --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text: #0f172a;
+  --text-2: #334155;
+  --muted: #64748b;
+  --primary: #0369a1;          /* Text, Links, Symbole – genug Kontrast auf Weiß */
+  --primary-hover: #075985;
   --primary-2: #0891b2;
-  --primary-soft: #eef0ff;
-  --primary-ring: rgba(79, 70, 229, .22);
+  --primary-soft: #e0f2fe;
+  --primary-ring: rgba(14, 165, 233, .28);
   --on-primary: #ffffff;
+  --accent: #38bdf8;           /* Hauptschaltflächen wie das Logo: Himmelblau mit Marineblau */
+  --accent-hover: #0ea5e9;
+  --on-accent: #0f172a;
   --pos: #0f8a5f;
   --pos-soft: #e2f5ec;
   --neg: #cf3049;
@@ -25,8 +32,8 @@
   --info-soft: #e8efff;
   --series-a: #14a37f;
   --series-b: #e0567a;
-  --hero-from: #4f46e5;
-  --hero-to: #0891b2;
+  --hero-from: #0f172a;
+  --hero-to: #0369a1;
   --shadow-sm: 0 1px 2px rgba(17, 21, 34, .05);
   --shadow: 0 1px 2px rgba(17, 21, 34, .04), 0 6px 20px rgba(17, 21, 34, .05);
   --shadow-lg: 0 24px 64px rgba(17, 21, 34, .2);
@@ -36,21 +43,24 @@
   color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --bg: #0b0e19;
-  --surface: #121727;
-  --surface-2: #181e31;
-  --surface-3: #20283f;
-  --border: #232b43;
-  --border-strong: #303a58;
-  --text: #e8ebf5;
-  --text-2: #c3c9dc;
-  --muted: #8f99b6;
-  --primary: #8b8dff;
-  --primary-hover: #a3a5ff;
+  --bg: #0a1020;
+  --surface: #0f172a;
+  --surface-2: #152038;
+  --surface-3: #1c2a47;
+  --border: #1e2b46;
+  --border-strong: #2c3c5e;
+  --text: #f1f5f9;
+  --text-2: #cbd5e1;
+  --muted: #94a3b8;
+  --primary: #38bdf8;
+  --primary-hover: #7dd3fc;
   --primary-2: #22d3ee;
-  --primary-soft: #222852;
-  --primary-ring: rgba(139, 141, 255, .3);
-  --on-primary: #0b0e19;
+  --primary-soft: #0c2b42;
+  --primary-ring: rgba(56, 189, 248, .32);
+  --on-primary: #0f172a;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --on-accent: #0f172a;
   --pos: #3fd09c;
   --pos-soft: #0f3127;
   --neg: #ff7d90;
@@ -61,8 +71,8 @@
   --info-soft: #172446;
   --series-a: #34d1a6;
   --series-b: #ff7a9c;
-  --hero-from: #3730a3;
-  --hero-to: #0e7490;
+  --hero-from: #0c4a6e;
+  --hero-to: #155e75;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
   --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .25);
   --shadow-lg: 0 24px 64px rgba(0, 0, 0, .55);
@@ -103,8 +113,8 @@ code { font: 12.5px ui-monospace, SFMono-Regular, Consolas, monospace; backgroun
 .btn:active { transform: translateY(1px); }
 .btn:focus-visible, .icon-btn:focus-visible, .seg button:focus-visible, .tabs button:focus-visible, .preset:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-ring); }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
-.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); box-shadow: 0 1px 2px rgba(79, 70, 229, .3); }
-.btn.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); box-shadow: 0 1px 2px rgba(14, 165, 233, .35); }
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 .btn.danger { color: var(--neg); }
 .btn.danger:hover { background: var(--neg-soft); border-color: transparent; }
 .btn.ghost { background: transparent; border-color: transparent; box-shadow: none; }
@@ -170,10 +180,10 @@ input.switch:focus-visible { box-shadow: 0 0 0 3px var(--primary-ring); }
 .auth-panel { padding: 48px 44px; display: flex; flex-direction: column; justify-content: center; gap: 18px; background: var(--surface); border-right: 1px solid var(--border); }
 .auth-hero {
   position: relative; overflow: hidden; padding: 64px; display: flex; flex-direction: column; justify-content: center; gap: 22px;
-  background: radial-gradient(1100px 600px at 0% 0%, #6366f1 0%, transparent 55%), radial-gradient(900px 520px at 100% 100%, #0891b2 0%, transparent 55%), #0f1430;
+  background: radial-gradient(1100px 600px at 0% 0%, #0369a1 0%, transparent 55%), radial-gradient(900px 520px at 100% 100%, #0e7490 0%, transparent 55%), #0f172a;
   color: #eef1ff;
 }
-.hero-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #a5b4fc; }
+.hero-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #7dd3fc; }
 .auth-hero h2 { font-size: 36px; font-weight: 750; letter-spacing: -.025em; max-width: 600px; line-height: 1.15; }
 .auth-hero p { color: #c7cdf5; max-width: 540px; font-size: 15.5px; }
 .auth-hero ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 680px; }
@@ -187,9 +197,9 @@ input.switch:focus-visible { box-shadow: 0 0 0 3px var(--primary-ring); }
 
 /* ---------- Marke ---------- */
 .brand { display: flex; align-items: center; gap: 11px; color: inherit; text-decoration: none !important; }
-.brand img { width: 36px; height: 36px; border-radius: 10px; box-shadow: 0 4px 12px rgba(79, 70, 229, .3); }
-.brand-name { font-weight: 800; letter-spacing: .1em; font-size: 15px; color: var(--text); }
-.brand-sub { font-size: 11.5px; color: var(--muted); letter-spacing: .02em; }
+.brand img { width: 36px; height: 36px; border-radius: 10px; box-shadow: 0 4px 12px rgba(14, 165, 233, .3); }
+.brand-name { font-weight: 850; letter-spacing: .02em; font-size: 16px; color: var(--text); line-height: 1.1; }
+.brand-sub { font-size: 10px; font-weight: 650; color: var(--muted); letter-spacing: .22em; text-transform: uppercase; margin-top: 2px; }
 .brand.big img { width: 46px; height: 46px; border-radius: 13px; }
 .brand.big .brand-name { font-size: 20px; }
 
@@ -210,7 +220,7 @@ input.switch:focus-visible { box-shadow: 0 0 0 3px var(--primary-ring); }
 .nav a.active .ic { color: var(--primary); }
 .nav .count { margin-left: auto; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 99px; background: var(--neg-soft); color: var(--neg); }
 .sidebar-foot { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 8px 2px; border-top: 1px solid var(--border); }
-.avatar { width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: #fff; background: linear-gradient(135deg, #6366f1, #0891b2); }
+.avatar { width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: #fff; background: linear-gradient(135deg, #38bdf8, #0369a1); }
 .avatar.sm { width: 26px; height: 26px; font-size: 11px; }
 .who { min-width: 0; flex: 1; }
 .who b, .who span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -287,7 +297,7 @@ input.switch:focus-visible { box-shadow: 0 0 0 3px var(--primary-ring); }
   position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;
   padding: 24px 26px; border-radius: 20px; color: #fff;
   background: radial-gradient(600px 300px at 100% 0%, rgba(255, 255, 255, .16), transparent 60%), linear-gradient(120deg, var(--hero-from), var(--hero-to));
-  box-shadow: 0 10px 30px rgba(79, 70, 229, .25);
+  box-shadow: 0 10px 30px rgba(3, 105, 161, .25);
 }
 .hero-card h2 { font-size: 24px; letter-spacing: -.02em; }
 .hero-card p { color: rgba(255, 255, 255, .85); margin-top: 4px; }
@@ -644,4 +654,14 @@ body[data-space="stock"] { --primary: #0d9488; --primary-hover: #0f766e; --prima
   .module.sub { margin-left: 0; }
   .system-teaser, .link-card, .timer-card { flex-wrap: wrap; }
   .stepper li { font-size: 12px; }
+}
+
+/* Logo (Anmeldeseite): helle bzw. dunkle Variante je nach Modus */
+.brand-logo img { display: block; height: 56px; width: auto; margin-left: -12px; }
+.brand-logo .logo-dark { display: none; }
+:root[data-theme="dark"] .brand-logo .logo-light { display: none; }
+:root[data-theme="dark"] .brand-logo .logo-dark { display: block; }
+.boot img { border-radius: 12px; }
+@media (max-width: 600px) {
+  .brand-logo img { height: 46px; margin-left: -10px; }
 }
