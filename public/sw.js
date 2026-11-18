@@ -1,6 +1,7 @@
-/* NEXCOUNT Service Worker – App-Shell offline verfügbar machen (Network-first) */
-const CACHE = 'nexcount-v3';
-const ASSETS = ['/', '/index.html', '/app.css', '/app.js', '/config.js', '/vendor/supabase.js', '/icon.svg', '/manifest.webmanifest'];
+/* NEXCOUNT Service Worker – App-Shell offline verfügbar machen (Network-first).
+   Pfade sind relativ, damit die App auch unter einem Unterpfad läuft (z. B. GitHub Pages /nexcount/). */
+const CACHE = 'nexcount-v4';
+const ASSETS = ['./', './index.html', './app.css', './app.js', './config.js', './vendor/supabase.js', './icon.svg', './manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -16,7 +17,7 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/')) return;
+  if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {
@@ -26,6 +27,6 @@ self.addEventListener('fetch', (e) => {
         }
         return res;
       })
-      .catch(() => caches.match(e.request).then((r) => r || caches.match('/index.html')))
+      .catch(() => caches.match(e.request).then((r) => r || caches.match('./index.html')))
   );
 });

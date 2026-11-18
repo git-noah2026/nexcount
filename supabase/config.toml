@@ -1,0 +1,2 @@
+# Supabase CLI – wird vom Workflow .github/workflows/supabase.yml genutzt
+project_id = "nexcount"

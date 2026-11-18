@@ -2,10 +2,11 @@
   "name": "NEXCOUNT by Andrerer",
   "short_name": "NEXCOUNT",
   "description": "Das Buchhaltungs- und Lagersystem für die Kleinen",
-  "start_url": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0b0e19",
   "theme_color": "#4f46e5",
   "lang": "de",
-  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
 }

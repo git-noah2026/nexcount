@@ -157,6 +157,8 @@
     })
     : null;
 
+  // Basisadresse der App (funktioniert auch unter einem Unterpfad wie /nexcount/)
+  const appBase = () => `${location.origin}${location.pathname.replace(/[^/]*$/, '')}`;
   const offlineError = () => Object.assign(new Error('Keine Verbindung zum Server.'), { offline: true });
   const isNetworkMsg = (m) => /failed to fetch|networkerror|network request failed|load failed|fetch failed/i.test(String(m || ''));
 
@@ -783,7 +785,7 @@
   function shellHtml() {
     return `<div id="shell" class="shell">
       <aside class="sidebar">
-        <a class="brand" href="#/dashboard"><img src="/icon.svg" alt=""><div><div class="brand-name">NEXCOUNT</div><div class="brand-sub">by Andrerer</div></div></a>
+        <a class="brand" href="#/dashboard"><img src="icon.svg" alt=""><div><div class="brand-name">NEXCOUNT</div><div class="brand-sub">by Andrerer</div></div></a>
         <nav class="nav" id="nav"></nav>
         <div class="sidebar-foot"><div class="avatar" id="me-avatar"></div><div class="who"><b id="me-name"></b><span id="me-company"></span></div>
           <button class="icon-btn" data-action="logout" title="Abmelden" aria-label="Abmelden">${icon('logout')}</button></div>
@@ -953,7 +955,7 @@
   function authShell(inner) {
     $('#app').innerHTML = `<div class="auth">
       <div class="auth-panel">
-        <div class="brand big"><img src="/icon.svg" alt=""><div><div class="brand-name">NEXCOUNT</div><div class="brand-sub">by Andrerer</div></div></div>
+        <div class="brand big"><img src="icon.svg" alt=""><div><div class="brand-name">NEXCOUNT</div><div class="brand-sub">by Andrerer</div></div></div>
         ${inner}
       </div>
       <div class="auth-hero">
@@ -2296,7 +2298,7 @@
       authEmail = email;
       try {
         if (authTab === 'forgot') {
-          const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/` });
+          const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: appBase() });
           if (error) throw error;
           return showMsg('Falls ein Konto mit dieser Adresse existiert, ist eine E-Mail mit einem Link unterwegs.', 'info');
         }
@@ -2304,7 +2306,7 @@
           const meta = { name: String(fd.name || '').trim() };
           if (authMode === 'join') meta.inviteCode = String(fd.inviteCode || '').trim().toUpperCase();
           else meta.companyName = String(fd.companyName || '').trim();
-          const { data, error } = await sb.auth.signUp({ email, password: fd.password, options: { data: meta, emailRedirectTo: `${location.origin}/` } });
+          const { data, error } = await sb.auth.signUp({ email, password: fd.password, options: { data: meta, emailRedirectTo: appBase() } });
           if (error) throw error;
           if (!data.session) {
             authTab = 'login';
@@ -2534,7 +2536,7 @@
     applyTheme();
     const r = (location.hash.match(/^#\/(\w+)/) || [])[1];
     UI.route = VIEWS[r] ? r : 'dashboard';
-    if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
     if (!sb) return renderSetupMissing();
 
     // Fehler aus E-Mail-Links (z. B. abgelaufener Bestätigungslink)

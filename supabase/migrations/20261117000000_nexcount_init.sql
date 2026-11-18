@@ -1,22 +1,23 @@
 -- =====================================================================
 -- NEXCOUNT – Supabase-Schema (Postgres)
--- Im Supabase-Dashboard unter „SQL Editor“ einmal komplett ausführen.
+-- Wird bei jedem Push auf main per GitHub Actions eingespielt (.github/workflows/supabase.yml).
+-- Wiederholbar: kann auch auf einer bereits eingerichteten Datenbank laufen.
 -- =====================================================================
 
 -- ---------------------------------------------------------------- Tabellen
-create table public.companies (
+create table if not exists public.companies (
   id         uuid primary key default gen_random_uuid(),
   name       text not null check (char_length(name) between 1 and 120),
   seq        bigint not null default 0,        -- fortlaufende Revision für die Synchronisierung
   created_at timestamptz not null default now()
 );
 
-create table public.company_invites (
+create table if not exists public.company_invites (
   company_id uuid primary key references public.companies(id) on delete cascade,
   code       text not null unique
 );
 
-create table public.members (
+create table if not exists public.members (
   user_id    uuid primary key references auth.users(id) on delete cascade,
   company_id uuid not null references public.companies(id) on delete cascade,
   name       text not null check (char_length(name) between 1 and 80),
@@ -24,10 +25,10 @@ create table public.members (
   role       text not null check (role in ('admin', 'member')),
   created_at timestamptz not null default now()
 );
-create index members_company_idx on public.members(company_id);
+create index if not exists members_company_idx on public.members(company_id);
 
 -- Alle Geschäftsdaten (Artikel, Bewegungen, Kontakte, Belege, Buchungen, Einstellungen)
-create table public.records (
+create table if not exists public.records (
   company_id uuid not null references public.companies(id) on delete cascade,
   collection text not null check (collection in ('articles','movements','contacts','documents','entries','settings')),
   id         text not null check (id ~ '^[A-Za-z0-9_-]{1,64}$'),
@@ -38,7 +39,7 @@ create table public.records (
   rev        bigint not null,
   primary key (company_id, collection, id)
 );
-create index records_rev_idx on public.records(company_id, rev);
+create index if not exists records_rev_idx on public.records(company_id, rev);
 
 -- ---------------------------------------------------------------- Hilfsfunktionen
 create or replace function public.my_company_id() returns uuid
@@ -57,15 +58,19 @@ alter table public.company_invites enable row level security;
 alter table public.members         enable row level security;
 alter table public.records         enable row level security;
 
+drop policy if exists "Eigene Firma lesen" on public.companies;
 create policy "Eigene Firma lesen" on public.companies
   for select to authenticated using (id = public.my_company_id());
 
+drop policy if exists "Einladungscode nur für Admins" on public.company_invites;
 create policy "Einladungscode nur für Admins" on public.company_invites
   for select to authenticated using (company_id = public.my_company_id() and public.my_role() = 'admin');
 
+drop policy if exists "Eigenes Profil, Admins sehen das Team" on public.members;
 create policy "Eigenes Profil, Admins sehen das Team" on public.members
   for select to authenticated using (user_id = auth.uid() or (company_id = public.my_company_id() and public.my_role() = 'admin'));
 
+drop policy if exists "Daten der eigenen Firma lesen" on public.records;
 create policy "Daten der eigenen Firma lesen" on public.records
   for select to authenticated using (company_id = public.my_company_id());
 
@@ -318,4 +323,9 @@ grant execute on function public.my_company_id(), public.my_role(), public.me(),
 
 -- ---------------------------------------------------------------- Live-Updates (Supabase Realtime)
 -- Jede Synchronisierung erhöht companies.seq → alle Geräte der Firma erhalten ein UPDATE-Ereignis.
-alter publication supabase_realtime add table public.companies;
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'companies') then
+    alter publication supabase_realtime add table public.companies;
+  end if;
+end $$;
