@@ -29,26 +29,26 @@ nach dem Einschalten des Lagers einmal eine Inventur machen.
 | Anmeldung         | **Supabase Auth** (E-Mail + Passwort, Bestätigungsmail, Passwort vergessen) |
 | Datenbank         | **Supabase Postgres** mit Row Level Security (`supabase/migrations/`)   |
 | Live-Updates      | **Supabase Realtime**                                                    |
-| Oberfläche        | **GitHub Pages** (statische Dateien aus `public/`)                       |
+| Oberfläche        | **Cloudflare Workers** (statische Dateien aus `public/`), aus GitHub gebaut |
 
-## GitHub ⇄ Supabase: so spielt alles zusammen
+## GitHub ⇄ Cloudflare ⇄ Supabase: so spielt alles zusammen
 
 ```
 git push (main)
-   ├─ .github/workflows/pages.yml     → prüft die Skripte und veröffentlicht public/ auf GitHub Pages
-   └─ .github/workflows/supabase.yml  → spielt neue Dateien aus supabase/migrations/ in Supabase ein
+   ├─ Cloudflare (mit dem Repo verbunden)  → npm run deploy → App live auf nexcount.andre5-noah.workers.dev
+   └─ .github/workflows/supabase.yml       → spielt neue Dateien aus supabase/migrations/ in Supabase ein
 ```
 
-- **App-Änderungen** (`public/…`): pushen → nach ca. 1 Minute live unter
-  `https://git-noah2026.github.io/nexcount/`.
+- **App-Änderungen** (`public/…`): pushen → Cloudflare baut und veröffentlicht automatisch.
+  Cloudflare-Einstellungen: Build command *leer*, Deploy command `npm run deploy`, Branch `main`.
 - **Datenbank-Änderungen**: neue Datei `supabase/migrations/<Zeitstempel>_<name>.sql` anlegen
   (z. B. `npx supabase migration new rechnungsnotizen`) → pushen → wird automatisch eingespielt.
   Bestehende Migrationen nie nachträglich ändern.
 
 ### Einmalige Einrichtung
 
-1. **GitHub Pages aktivieren:** Repo → *Settings → Pages → Build and deployment → Source:*
-   **GitHub Actions**.
+1. **Cloudflare mit GitHub verbinden:** *Workers & Pages → nexcount → Settings → Build →
+   Git repository* → `git-noah2026/nexcount`, Branch `main`, Deploy command `npm run deploy`.
 2. **Secrets für Supabase** (Repo → *Settings → Secrets and variables → Actions → New repository secret*):
    - `SUPABASE_ACCESS_TOKEN` – in Supabase unter *Account → Access Tokens* erzeugen
    - `SUPABASE_DB_PASSWORD` – das beim Anlegen des Projekts erzeugte Datenbank-Passwort
@@ -56,13 +56,14 @@ git push (main)
    Ohne diese Secrets läuft die App trotzdem; nur das automatische Einspielen von
    Datenbank-Änderungen wird mit einem Hinweis übersprungen.
 3. **Supabase → Authentication → URL Configuration:** *Site URL*
-   `https://git-noah2026.github.io/nexcount/` und unter *Redirect URLs*
-   `https://git-noah2026.github.io/nexcount/**` eintragen (für Bestätigungs- und Passwort-Mails).
+   `https://nexcount.andre5-noah.workers.dev` und unter *Redirect URLs*
+   `https://nexcount.andre5-noah.workers.dev/**` (für Bestätigungs- und Passwort-Mails – bereits eingerichtet).
 4. [`public/config.js`](public/config.js) enthält *Project URL* und *Publishable key* – beide sind
    öffentlich gedacht. Niemals den `secret`/`service_role` Key ins Repo schreiben!
 
 Die erste Migration ist wiederholbar geschrieben und kann gefahrlos auf eine bereits eingerichtete
-Datenbank laufen. Cloudflare (`wrangler.jsonc`) ist optional und wird nicht mehr benötigt.
+Datenbank laufen. Die App nutzt relative Pfade und funktioniert daher auch unter einem Unterpfad
+(z. B. GitHub Pages), falls die Auslieferung später einmal wechseln soll.
 
 ## Lokal entwickeln
 
