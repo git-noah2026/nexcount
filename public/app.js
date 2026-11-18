@@ -24,9 +24,9 @@
   };
   const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
   const r3 = (n) => Math.round((Number(n) || 0) * 1000) / 1000;
-  const EUR = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
-  const NUMF = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 3 });
-  const COMPACT = new Intl.NumberFormat('de-DE', { notation: 'compact', maximumFractionDigits: 1 });
+  const EUR = new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' });
+  const NUMF = new Intl.NumberFormat('de-AT', { maximumFractionDigits: 3 });
+  const COMPACT = new Intl.NumberFormat('de-AT', { notation: 'compact', maximumFractionDigits: 1 });
   const money = (n) => EUR.format(r2(n));
   const fmtNum = (n) => NUMF.format(Number(n) || 0);
   const pad = (n) => String(n).padStart(2, '0');
@@ -42,12 +42,12 @@
     const [y, m, d] = String(s).slice(0, 10).split('-');
     return `${d}.${m}.${y}`;
   };
-  const fmtTime = (t) => new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+  const fmtTime = (t) => new Date(t).toLocaleString('de-AT', { dateStyle: 'short', timeStyle: 'short' });
   const sum = (arr, f) => arr.reduce((a, x) => a + (Number(f(x)) || 0), 0);
   const byName = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'de');
   const byDateDesc = (a, b) => String(b.date || '').localeCompare(String(a.date || '')) || (b.createdAt || 0) - (a.createdAt || 0);
   const initials = (n) => String(n || '?').split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
-  const monthLabel = (k) => new Date(`${k}-01T12:00:00`).toLocaleDateString('de-DE', { month: 'short', year: '2-digit' });
+  const monthLabel = (k) => new Date(`${k}-01T12:00:00`).toLocaleDateString('de-AT', { month: 'short', year: '2-digit' });
   const lastMonths = (n) => {
     const out = [];
     const d = new Date();
@@ -71,19 +71,19 @@
     quote: { label: 'Angebot', plural: 'Angebote', prefixKey: 'quotePrefix', prefix: 'AN', module: 'quotes', contact: 'customer', icon: 'send' },
     purchase: { label: 'Einkauf', plural: 'Einkäufe', prefixKey: 'purchasePrefix', prefix: 'EK', module: 'purchases', contact: 'supplier', icon: 'cart' },
   };
-  // Funktionen, die jede Organisation nach Bedarf ein- und ausschalten kann (Kassenbuch ist immer aktiv)
+  // Funktionen, die jede Organisation nach Bedarf ein- und ausschalten kann (Kassabuch ist immer aktiv)
   const MODULES = {
-    invoices: { label: 'Rechnungen', icon: 'file', desc: 'Rechnungen schreiben, als PDF drucken, Zahlungseingänge automatisch ins Kassenbuch buchen.', requires: ['contacts'] },
+    invoices: { label: 'Rechnungen', icon: 'file', desc: 'Rechnungen schreiben, als PDF drucken, Zahlungseingänge automatisch ins Kassabuch buchen.', requires: ['contacts'] },
     quotes: { label: 'Angebote', icon: 'send', desc: 'Angebote erstellen und mit einem Klick in eine Rechnung umwandeln.', requires: ['invoices'] },
     purchases: { label: 'Einkäufe', icon: 'cart', desc: 'Eingangsrechnungen von Lieferanten erfassen.', requires: ['contacts'] },
     time: { label: 'Zeiterfassung', icon: 'clock', desc: 'Arbeitszeiten je Kunde und Projekt erfassen und mit einem Klick abrechnen.', requires: ['invoices'] },
     contacts: { label: 'Kunden & Lieferanten', icon: 'users', desc: 'Adressbuch mit Umsatzübersicht je Kontakt.' },
     catalog: { label: 'Produkte & Leistungen', icon: 'tag', desc: 'Deine Preisliste – Positionen mit einem Klick in Rechnungen und Angebote übernehmen.' },
     members: { label: 'Mitgliederverwaltung', icon: 'heart', desc: 'Mitglieder mit Nummer, Status, Eintritt, Beitragsgruppe und Bankverbindung.' },
-    dues: { label: 'Mitgliedsbeiträge', icon: 'repeat', desc: 'Beitragsläufe je Jahr, Halbjahr, Quartal oder Monat – Zahlungen landen im Kassenbuch.', requires: ['members'] },
-    donations: { label: 'Spenden', icon: 'gift', desc: 'Spenden erfassen und Zuwendungsbestätigungen nach amtlichem Muster drucken.' },
+    dues: { label: 'Mitgliedsbeiträge', icon: 'repeat', desc: 'Beitragsläufe je Jahr, Halbjahr, Quartal oder Monat – Zahlungen landen im Kassabuch.', requires: ['members'] },
+    donations: { label: 'Spenden', icon: 'gift', desc: 'Spenden erfassen, Spendenbestätigungen drucken und die Jahresliste für die Spendenmeldung erstellen.' },
     inventory: { label: 'NEXCOUNT Lager', icon: 'layers', desc: 'Eigenständiges Lagersystem mit eigenem Bereich – auf Wunsch mit der Buchhaltung verknüpft.' },
-    reports: { label: 'Berichte & Export', icon: 'chart', desc: 'Gewinnermittlung, Umsatzsteuer bzw. Kassenbericht, CSV- und Backup-Export.' },
+    reports: { label: 'Berichte & Export', icon: 'chart', desc: 'Gewinnermittlung, Umsatzsteuer bzw. Kassabericht, CSV- und Backup-Export.' },
   };
   const ALL_MODULES = Object.keys(MODULES);
   // bisheriger Stand für Firmen ohne gespeicherte Auswahl
@@ -94,39 +94,45 @@
     sole: { label: 'Einzelunternehmer & Freiberufler', short: 'Selbstständig', icon: 'user',
       desc: 'Du arbeitest allein: Rechnungen schreiben, Zeiten und Ausgaben erfassen, Steuer im Blick.',
       modules: ['invoices', 'quotes', 'contacts', 'catalog', 'time', 'reports'],
-      legal: ['Einzelunternehmen', 'Freiberufler', 'Kleingewerbe'] },
+      legal: ['Einzelunternehmen', 'e.U. (eingetragenes Unternehmen)', 'Neue Selbständige / Freiberufler'] },
     service: { label: 'Dienstleistungsunternehmen', short: 'Dienstleister', icon: 'briefcase',
       desc: 'Agentur, Beratung, Handwerksservice: Zeiten erfassen, Angebote und Rechnungen schreiben.',
       modules: ['invoices', 'quotes', 'purchases', 'contacts', 'catalog', 'time', 'reports'],
-      legal: ['GmbH', 'UG (haftungsbeschränkt)', 'GbR', 'PartG', 'Einzelunternehmen', 'OHG / KG'] },
+      legal: ['GmbH', 'FlexCo', 'e.U.', 'OG', 'KG', 'GesbR', 'Einzelunternehmen'] },
     small: { label: 'Kleinunternehmen & Handel', short: 'Kleinunternehmen', icon: 'cart',
       desc: 'Laden, Werkstatt oder Handel: Verkauf und Einkauf – das Lager kannst du dazuschalten.',
       modules: ['invoices', 'quotes', 'purchases', 'contacts', 'catalog', 'reports'],
-      legal: ['Einzelunternehmen', 'e. K.', 'GbR', 'GmbH', 'UG (haftungsbeschränkt)', 'OHG / KG'] },
+      legal: ['Einzelunternehmen', 'e.U.', 'GmbH', 'FlexCo', 'OG', 'KG', 'GesbR'] },
     club: { label: 'Verein', short: 'Verein', icon: 'heart',
-      desc: 'Mitglieder, Beiträge, Spenden mit Zuwendungsbestätigung und Kassenbericht für die Versammlung.',
+      desc: 'Mitglieder, Beiträge, Spenden mit Spendenbestätigung und Kassabericht für die Generalversammlung.',
       modules: ['members', 'dues', 'donations', 'contacts', 'reports'],
-      legal: ['Eingetragener Verein (e. V.)', 'Nicht eingetragener Verein', 'Gemeinnützige GmbH', 'Stiftung'] },
+      legal: ['Verein', 'Zweigverein', 'Gemeinnützige GmbH', 'Gemeinnützige Stiftung'] },
   };
   const PRESETS = {
     ...Object.fromEntries(Object.entries(ORG_TYPES).map(([k, t]) => [k, { label: t.label, icon: t.icon, desc: t.desc, modules: t.modules }])),
-    simple: { label: 'Nur Kassenbuch', icon: 'book', desc: 'Einnahmen und Ausgaben erfassen – mehr nicht.', modules: ['reports'] },
+    simple: { label: 'Nur Kassabuch', icon: 'book', desc: 'Einnahmen und Ausgaben erfassen – mehr nicht.', modules: ['reports'] },
     all: { label: 'Alles', icon: 'dashboard', desc: 'Alle Funktionen einschalten.', modules: ALL_MODULES },
   };
-  // Buchungsbereiche (Sphären) gemeinnütziger Vereine
-  const SPHERES = { ideell: 'Ideeller Bereich', vermoegen: 'Vermögensverwaltung', zweck: 'Zweckbetrieb', wirtschaft: 'Wirtschaftl. Geschäftsbetrieb' };
+  // Tätigkeitsbereiche gemeinnütziger Vereine nach BAO (§§ 44–47) und Vereinsrichtlinien
+  const SPHERES = {
+    ideell: 'Ideeller Bereich',
+    zweck: 'Unentbehrlicher Hilfsbetrieb',
+    entbehrlich: 'Entbehrlicher Hilfsbetrieb',
+    wirtschaft: 'Begünstigungsschädlicher Betrieb',
+    vermoegen: 'Vermögensverwaltung',
+  };
   const CATS = {
     business: {
-      income: ['Warenverkauf', 'Dienstleistung', 'Provision', 'Zinserträge', 'Sonstige Einnahmen'],
-      expense: ['Wareneinkauf', 'Miete', 'Personal', 'Büromaterial', 'Software', 'Fahrzeug', 'Reisekosten', 'Marketing', 'Versicherung', 'Telefon/Internet', 'Bankgebühren', 'Sonstige Ausgaben'],
+      income: ['Warenerlöse', 'Dienstleistungserlöse', 'Provisionen', 'Zinserträge', 'Sonstige Einnahmen'],
+      expense: ['Wareneinkauf', 'Miete & Betriebskosten', 'Personal', 'SVS-Beiträge', 'Büromaterial', 'Software', 'Kfz', 'Reisekosten', 'Werbung', 'Versicherung', 'Telefon & Internet', 'Bankspesen', 'Sonstige Ausgaben'],
     },
     service: {
-      income: ['Honorare', 'Dienstleistung', 'Beratung', 'Lizenzen', 'Sonstige Einnahmen'],
-      expense: ['Fremdleistungen', 'Software', 'Büro & Miete', 'Reisekosten', 'Fortbildung', 'Telefon/Internet', 'Versicherung', 'Marketing', 'Fahrzeug', 'Bankgebühren', 'Sonstige Ausgaben'],
+      income: ['Honorare', 'Dienstleistungserlöse', 'Beratung', 'Lizenzen', 'Sonstige Einnahmen'],
+      expense: ['Fremdleistungen', 'SVS-Beiträge', 'Software', 'Büro & Miete', 'Reisekosten', 'Fortbildung', 'Telefon & Internet', 'Versicherung', 'Werbung', 'Kfz', 'Bankspesen', 'Sonstige Ausgaben'],
     },
     club: {
-      income: ['Mitgliedsbeiträge', 'Spenden', 'Zuschüsse', 'Veranstaltungen', 'Bewirtung & Verkauf', 'Zinserträge', 'Sonstige Einnahmen'],
-      expense: ['Übungsleiter', 'Hallen- & Platzmiete', 'Material & Ausstattung', 'Veranstaltungen', 'Verbandsbeiträge', 'Versicherung', 'Bürobedarf & Porto', 'Fahrtkosten', 'Bankgebühren', 'Sonstige Ausgaben'],
+      income: ['Mitgliedsbeiträge', 'Spenden', 'Subventionen', 'Sponsoring', 'Veranstaltungen', 'Kantine & Buffet', 'Zinserträge', 'Sonstige Einnahmen'],
+      expense: ['Trainer & Übungsleiter', 'Hallen- & Platzmiete', 'Material & Ausstattung', 'Veranstaltungen', 'Verbandsbeiträge', 'Versicherung', 'Büro & Porto', 'Fahrtkosten', 'Bankspesen', 'Sonstige Ausgaben'],
     },
   };
   const INTERVALS = { year: ['jährlich', 1], half: ['halbjährlich', 2], quarter: ['vierteljährlich', 4], month: ['monatlich', 12] };
@@ -134,8 +140,8 @@
   const ART_TYPES = { product: 'Produkt (Ware)', service: 'Leistung (Dienstleistung)' };
   const KINDS = { income: 'Einnahme', expense: 'Ausgabe' };
   const CONTACT_TYPES = { customer: 'Kunde', supplier: 'Lieferant', both: 'Kunde & Lieferant' };
-  const METHODS = ['Bank', 'Kasse', 'Karte', 'PayPal', 'Sonstige'];
-  const RATES = [[19, '19 %'], [7, '7 %'], [0, '0 %']];
+  const METHODS = ['Bank', 'Kassa', 'Bankomat', 'Kreditkarte', 'PayPal', 'Sonstige'];
+  const RATES = [[20, '20 %'], [13, '13 %'], [10, '10 %'], [0, '0 %']];
   const UNITS = ['Stk', 'kg', 'g', 'l', 'm', 'm²', 'Pkt', 'Karton', 'Std'];
 
   const I = {
@@ -807,7 +813,7 @@
     const entry = put('entries', {
       date,
       kind: sale ? 'income' : 'expense',
-      category: sale ? (hasGoods ? 'Warenverkauf' : 'Dienstleistung') : 'Wareneinkauf',
+      category: sale ? (hasGoods ? 'Warenerlöse' : 'Dienstleistungserlöse') : 'Wareneinkauf',
       description: `${doc.number} · ${(doc.contact && doc.contact.name) || ''}`.trim(),
       net: t.net, tax: t.tax, gross: t.gross, rate,
       method, ref: doc.number, docId: doc.id,
@@ -845,12 +851,12 @@
     books: { label: 'Buchhaltung', icon: 'book', home: 'dashboard' },
     stock: { label: 'Lager', icon: 'layers', home: 'stockhome' },
   };
-  const todayLong = () => new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const todayLong = () => new Date().toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const VIEWS = {
     dashboard: { space: 'books', title: 'Übersicht', short: 'Start', icon: 'dashboard', group: 'start', render: viewDashboard, sub: todayLong },
     members: { space: 'books', title: 'Mitglieder', short: 'Mitglieder', icon: 'heart', group: 'club', when: () => mod('members'), render: viewMembers, sub: 'Mitgliederverwaltung' },
     dues: { space: 'books', title: 'Beiträge', short: 'Beiträge', icon: 'repeat', group: 'club', when: () => mod('dues'), render: viewDues, sub: 'Beitragsläufe und Zahlungseingänge' },
-    donations: { space: 'books', title: 'Spenden', short: 'Spenden', icon: 'gift', group: 'club', when: () => mod('donations'), render: viewDonations, sub: 'Spenden und Zuwendungsbestätigungen' },
+    donations: { space: 'books', title: 'Spenden', short: 'Spenden', icon: 'gift', group: 'club', when: () => mod('donations'), render: viewDonations, sub: 'Spenden, Bestätigungen und Spendenmeldung' },
     documents: { space: 'books', title: () => { const k = docKindsOn(); return k.length === 1 ? DOC_KINDS[k[0]].plural : 'Belege'; }, short: 'Belege', icon: 'file', group: 'sales',
       when: () => docKindsOn().length > 0, render: viewDocuments,
       sub: () => { const p = docKindsOn().map((k) => DOC_KINDS[k].plural); return p.length > 1 ? `${p.slice(0, -1).join(', ')} & ${p[p.length - 1]}` : 'Schreiben, drucken, Zahlungen verbuchen'; } },
@@ -858,8 +864,8 @@
     contacts: { space: 'books', title: () => (isClub() ? 'Kontakte' : 'Kunden & Lieferanten'), short: 'Kontakte', icon: 'users', group: 'sales', when: () => mod('contacts'), render: viewContacts,
       sub: () => (isClub() ? 'Spender, Partner und Lieferanten' : 'Adressbuch mit Umsätzen') },
     articles: { space: 'books', title: 'Produkte & Leistungen', short: 'Preisliste', icon: 'tag', group: 'sales', when: () => mod('catalog'), render: viewArticles, sub: 'Deine Preisliste für Rechnungen und Angebote' },
-    entries: { space: 'books', title: 'Kassenbuch', short: 'Kasse', icon: 'book', group: 'money', render: viewEntries, sub: 'Alle Einnahmen und Ausgaben' },
-    reports: { space: 'books', title: () => (isClub() ? 'Kassenbericht' : 'Berichte'), short: 'Berichte', icon: 'chart', group: 'money', when: () => mod('reports'), render: viewReports,
+    entries: { space: 'books', title: 'Kassabuch', short: 'Kassa', icon: 'book', group: 'money', render: viewEntries, sub: 'Alle Einnahmen und Ausgaben' },
+    reports: { space: 'books', title: () => (isClub() ? 'Kassabericht' : 'Berichte'), short: 'Berichte', icon: 'chart', group: 'money', when: () => mod('reports'), render: viewReports,
       sub: () => (isClub() ? 'Einnahmen und Ausgaben nach Bereichen, Exporte' : 'Gewinn, Umsatzsteuer und Exporte') },
     stockhome: { space: 'stock', title: 'Lager-Übersicht', short: 'Übersicht', icon: 'dashboard', group: 'stock', when: () => mod('inventory'), render: viewStockHome,
       sub: () => (stockLinked() ? 'Mit der Buchhaltung verknüpft' : 'Eigenständig – nicht mit Belegen verknüpft') },
@@ -999,7 +1005,7 @@
     else if (S.syncError) { cls = 'err'; text = 'Sync-Fehler'; }
     else if (waiting) { cls = 'off'; text = `${waiting} wartet auf Server`; }
     else if (n) { cls = 'busy'; text = `${n} ausstehend`; }
-    else { cls = 'ok'; text = S.lastSync ? `Synchronisiert · ${new Date(S.lastSync).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : 'Verbunden'; }
+    else { cls = 'ok'; text = S.lastSync ? `Synchronisiert · ${new Date(S.lastSync).toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit' })}` : 'Verbunden'; }
     el.className = `sync ${cls}`;
     el.innerHTML = `<span class="dot"></span><span class="sync-text">${esc(text)}</span>`;
     el.title = S.syncError || (waiting ? 'Einige Änderungen nimmt der Server noch nicht an (Datenbank-Update ausstehend). Sie bleiben gespeichert und werden automatisch erneut gesendet.'
@@ -1049,7 +1055,7 @@
     return `${rf('companyName', club ? 'Name des Vereins' : 'Name der Firma / deines Unternehmens', 'required maxlength="120" autocomplete="organization"')}
       ${field('Rechtsform', `<select data-reg="legalForm" name="legalForm">${T.legal.map((l) => `<option ${REG.legalForm === l ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`)}
       ${club ? `<label class="check"><input type="checkbox" data-reg="nonProfit" ${REG.nonProfit ? 'checked' : ''}> Gemeinnützig anerkannt (Spendenbescheinigungen)</label>` : ''}
-      <label class="check"><input type="checkbox" data-reg="smallBusiness" ${REG.smallBusiness ? 'checked' : ''}> Kleinunternehmerregelung (§ 19 UStG)</label>`;
+      <label class="check"><input type="checkbox" data-reg="smallBusiness" ${REG.smallBusiness ? 'checked' : ''}> Kleinunternehmerregelung (§ 6 Abs. 1 Z 27 UStG)</label>`;
   }
 
   function renderAuth(msg, type) {
@@ -1134,10 +1140,10 @@
       <div class="auth-hero">
         <span class="hero-eyebrow">NEXCOUNT by Andrerer</span>
         <h2>Das Buchhaltungs- und Lagersystem für die Kleinen.</h2>
-        <p>Für Selbstständige, Dienstleister, Kleinunternehmen und Vereine – jeweils mit den Funktionen, die wirklich gebraucht werden. Das Lager ist ein eigenes System, das du bei Bedarf dazuschaltest und verknüpfst.</p>
+        <p>Für Selbstständige, Dienstleister, Kleinunternehmen und Vereine in Österreich – jeweils mit den Funktionen, die wirklich gebraucht werden. Das Lager ist ein eigenes System, das du bei Bedarf dazuschaltest und verknüpfst.</p>
         <ul>
-          <li>${icon('briefcase', 20)}<div><b>Unternehmen & Selbstständige</b><span>Angebote, Rechnungen, Zeiterfassung, Kassenbuch und Steuerübersicht.</span></div></li>
-          <li>${icon('heart', 20)}<div><b>Vereine</b><span>Mitglieder, Beitragsläufe, Spenden mit Zuwendungsbestätigung, Kassenbericht.</span></div></li>
+          <li>${icon('briefcase', 20)}<div><b>Unternehmen & Selbstständige</b><span>Angebote, Rechnungen, Zeiterfassung, Kassabuch und Steuerübersicht.</span></div></li>
+          <li>${icon('heart', 20)}<div><b>Vereine</b><span>Mitglieder, Beitragsläufe, Spenden mit Spendenmeldung, Kassabericht.</span></div></li>
           <li>${icon('layers', 20)}<div><b>NEXCOUNT Lager</b><span>Eigenes System für Bestände – eigenständig oder mit der Buchhaltung verknüpft.</span></div></li>
           <li>${icon('zap', 20)}<div><b>Live, offline & im Team</b><span>Alle Geräte synchron, Einladungscode für Mitarbeiter und Vorstand.</span></div></li>
         </ul>
@@ -1198,7 +1204,7 @@
         </label>` : ''}
       </div>`;
     return `<div class="module-list">
-      ${row('entries', { label: 'Kassenbuch', icon: 'book', desc: 'Einnahmen und Ausgaben – das Herz deiner Buchhaltung. Immer aktiv.' }, true, true)}
+      ${row('entries', { label: 'Kassabuch', icon: 'book', desc: 'Einnahmen und Ausgaben – das Herz deiner Buchhaltung. Immer aktiv.' }, true, true)}
       ${first.map((k) => row(k, MODULES[k], !!mods[k], false)).join('')}
       ${rest.length ? `<div class="list-divider">Weitere Funktionen</div>${rest.map((k) => row(k, MODULES[k], !!mods[k], false)).join('')}` : ''}
       <div class="list-divider">Eigenes System</div>
@@ -1219,6 +1225,7 @@
       street: s.street || '', zip: s.zip || '', city: s.city || '',
       taxNumber: s.taxNumber || '', vatId: s.vatId || '', taxOffice: s.taxOffice || '',
       exemptionDate: s.exemptionDate || '', purposes: s.purposes || '', register: s.register || '',
+      fbNumber: s.fbNumber || '', donationRegNo: s.donationRegNo || '',
       hourlyRate: s.hourlyRate ?? '',
       modules: { ...currentModules() },
       inventoryLink: s.inventoryLink !== false,
@@ -1248,23 +1255,23 @@
         <div class="setup-form">
           <div class="grid2">
             ${field('Rechtsform', `<select data-setup-field="legalForm">${T.legal.map((l) => `<option ${st.legalForm === l ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`)}
-            ${club ? sf('register', 'Registergericht & Nr.', 'placeholder="z. B. AG Musterstadt VR 1234"') : sf('vatId', 'USt-IdNr.', 'placeholder="DE…"')}
+            ${club ? sf('register', 'ZVR-Zahl', 'placeholder="z. B. 123456789" inputmode="numeric"') : sf('vatId', 'UID-Nr.', 'placeholder="ATU…"')}
             ${sf('street', 'Straße & Hausnr.', 'autocomplete="street-address"', 'span2')}
             ${sf('zip', 'PLZ', 'inputmode="numeric"')}
             ${sf('city', 'Ort')}
-            ${sf('taxNumber', 'Steuernummer')}
-            ${!club && st.orgType !== 'small' ? sf('hourlyRate', 'Standard-Stundensatz netto (€)', 'type="number" step="any" min="0"') : '<div></div>'}
+            ${sf('taxNumber', 'Steuernummer', 'placeholder="z. B. 12 345/6789"')}
+            ${!club ? sf('fbNumber', 'Firmenbuchnummer & Gericht', 'placeholder="z. B. FN 123456a, LG Graz (falls eingetragen)"') : '<div></div>'}
+            ${!club && st.orgType !== 'small' ? sf('hourlyRate', 'Standard-Stundensatz netto (€)', 'type="number" step="any" min="0"') : ''}
           </div>
           <div class="check-cards">
             ${club ? `<label class="check-card ${st.nonProfit ? 'on' : ''}"><input type="checkbox" data-setup-field="nonProfit" ${st.nonProfit ? 'checked' : ''}>
-              <span><b>Gemeinnützig anerkannt</b><small>Spenden mit Zuwendungsbestätigung, Buchungen nach Bereichen (ideell, Vermögensverwaltung, Zweckbetrieb, wirtschaftlich).</small></span></label>` : ''}
+              <span><b>Gemeinnützig (§§ 34 ff. BAO)</b><small>Buchungen nach Tätigkeitsbereichen (ideell, Hilfsbetriebe, begünstigungsschädlicher Betrieb, Vermögensverwaltung), Spendenbestätigungen.</small></span></label>` : ''}
             <label class="check-card ${st.smallBusiness ? 'on' : ''}"><input type="checkbox" data-setup-field="smallBusiness" ${st.smallBusiness ? 'checked' : ''}>
-              <span><b>Kleinunternehmerregelung (§ 19 UStG)</b><small>Keine Umsatzsteuer auf Rechnungen und Angeboten${club ? ' – trifft auf die meisten Vereine zu' : ''}.</small></span></label>
+              <span><b>Kleinunternehmerregelung (§ 6 Abs. 1 Z 27 UStG)</b><small>Keine Umsatzsteuer auf Rechnungen und Angeboten – Umsatzgrenze 55.000 € brutto pro Jahr (Stand 2025)${club ? '; trifft auf die meisten Vereine zu' : ''}.</small></span></label>
           </div>
           ${club && st.nonProfit ? `<div class="grid2">
-            ${sf('taxOffice', 'Finanzamt', 'placeholder="z. B. Finanzamt Musterstadt"')}
-            ${sf('exemptionDate', 'Freistellungsbescheid vom', 'type="date"')}
-            ${sf('purposes', 'Steuerbegünstigte Zwecke', 'placeholder="z. B. Förderung des Sports"', 'span2')}
+            ${sf('purposes', 'Begünstigte Zwecke laut Statuten', 'placeholder="z. B. Förderung des Amateursports"', 'span2')}
+            ${sf('donationRegNo', 'Spendenbegünstigt – Registrierungsnr. (BMF-Liste)', 'placeholder="z. B. SO 1234 – leer, falls nicht spendenbegünstigt"', 'span2')}
           </div>` : ''}
         </div>`;
     } else {
@@ -1291,7 +1298,7 @@
     const admin = S.user.role === 'admin';
     const club = isClub();
     const steps = [
-      [club ? 'Vereinsdaten hinterlegen' : 'Firmendaten hinterlegen', club ? 'Anschrift, Finanzamt und Freistellungsbescheid.' : 'Adresse, Steuernummer und Bankverbindung für deine Belege.', '#/settings', 'org'],
+      [club ? 'Vereinsdaten hinterlegen' : 'Firmendaten hinterlegen', club ? 'Anschrift, ZVR-Zahl und Spendenbegünstigung.' : 'Adresse, Steuernummer und Bankverbindung für deine Belege.', '#/settings', 'org'],
       mod('members') && ['Mitglieder erfassen', 'Mit Beitrag und Intervall – dann erledigt der Beitragslauf den Rest.', '#/members'],
       mod('catalog') && ['Produkte & Leistungen anlegen', 'Mit Preisen – dann sind Rechnungspositionen ein Klick.', '#/articles'],
       mod('contacts') && !club && ['Kunden anlegen', 'Unter Kunden & Lieferanten.', '#/contacts'],
@@ -1327,7 +1334,7 @@
     const entries = all('entries');
     const year = today().slice(0, 4);
     const ym = today().slice(0, 7);
-    const monthName = new Date().toLocaleDateString('de-DE', { month: 'long' });
+    const monthName = new Date().toLocaleDateString('de-AT', { month: 'long' });
     const months = lastMonths(6).map((k) => {
       const es = entries.filter((e) => String(e.date || '').startsWith(k));
       return { label: monthLabel(k), a: sum(es.filter((e) => e.kind === 'income'), (e) => e.net), b: sum(es.filter((e) => e.kind === 'expense'), (e) => e.net) };
@@ -1411,7 +1418,7 @@
       }
     }
     if (low.length && note === 'Alles im grünen Bereich.') note = `Im Lager ${low.length === 1 ? 'liegt 1 Artikel' : `liegen ${low.length} Artikel`} unter dem Mindestbestand.`;
-    panels.push(listPanel('Letzte Buchungen', '<a href="#/entries">Kassenbuch</a>', recent, 'book', 'Noch keine Buchungen.'));
+    panels.push(listPanel('Letzte Buchungen', '<a href="#/entries">Kassabuch</a>', recent, 'book', 'Noch keine Buchungen.'));
 
     const tip = !orgType() && S.user.role === 'admin'
       ? `<section class="tip-card">${icon('sliders', 20)}<div><b>Neu: NEXCOUNT passt sich deiner Organisation an</b><span>Verein, Dienstleister, Einzelunternehmer oder Kleinunternehmen – mit passenden Funktionen und dem Lager als eigenem System.</span></div><button class="btn sm" data-action="reopen-setup">Einrichten</button></section>`
@@ -1484,7 +1491,7 @@
     const inStock = ctx === 'stock';
     const smallBiz = !!settings().smallBusiness;
     const type0 = inStock ? 'product' : (a && a.type) || (presetType === 'service' || presetType === 'product' ? presetType : 'service');
-    const d = a || { sku: nextCode('articles', inStock ? 'L' : 'A', 'sku'), unit: type0 === 'service' ? 'Std' : 'Stk', tax: smallBiz ? 0 : 19, ek: '', vk: '', min: '', sellable: inStock ? linked && mod('catalog') : true };
+    const d = a || { sku: nextCode('articles', inStock ? 'L' : 'A', 'sku'), unit: type0 === 'service' ? 'Std' : 'Stk', tax: smallBiz ? 0 : 20, ek: '', vk: '', min: '', sellable: inStock ? linked && mod('catalog') : true };
     const cats = all('articles').map((x) => x.category).filter(Boolean);
     const locs = all('articles').map((x) => x.location).filter(Boolean);
     const st = stockMap();
@@ -1507,7 +1514,7 @@
           ${field('Kategorie', inp('category', d.category, 'list="dl-cat" maxlength="60"'))}
           ${field('Einheit', inp('unit', d.unit, 'list="dl-unit" maxlength="20"'))}
           ${!inStock || mod('catalog') ? field('Verkaufspreis netto (€)', numInp('vk', d.vk, 'min="0"')) : ''}
-          ${!inStock || mod('catalog') ? field('USt-Satz', selectEl('tax', RATES, d.tax ?? 19)) : ''}
+          ${!inStock || mod('catalog') ? field('USt-Satz', selectEl('tax', RATES, d.tax ?? 20)) : ''}
           ${field(inv ? 'Einkaufspreis / Wert netto (€)' : 'Eigene Kosten netto (€, optional)', numInp('ek', d.ek, 'min="0"'))}
           ${!inStock || mod('catalog') ? '<div class="field"><span>Marge</span><input id="art-margin" readonly></div>' : ''}
           ${sellToggle}
@@ -1845,7 +1852,7 @@
       dueDate: kind === 'purchase' ? '' : addDays(today(), days), items: [], contactId: '', reference: '', notes: '',
     };
     const useCatalog = mod('catalog') && articles().length > 0;
-    const newItem = () => ({ articleId: '', text: '', qty: 1, price: '', tax: smallBiz ? 0 : 19 });
+    const newItem = () => ({ articleId: '', text: '', qty: 1, price: '', tax: smallBiz ? 0 : 20 });
     if (!doc.items.length) doc.items.push(newItem());
     const contacts = all('contacts').filter((c) => c.type === 'both' || c.type === K.contact).sort(byName);
 
@@ -1876,6 +1883,7 @@
           ${field(labels.date, inp('date', doc.date, 'type="date" required'))}
           ${labels.due ? field(labels.due, inp('dueDate', doc.dueDate, 'type="date"')) : field(labels.ref, inp('reference', doc.reference, 'maxlength="60"'))}
           ${labels.due ? field(labels.ref, inp('reference', doc.reference, 'maxlength="80"')) : ''}
+          ${customer ? field(kind === 'quote' ? 'Leistungszeitraum (optional)' : 'Leistungsdatum / -zeitraum', inp('serviceDate', doc.serviceDate, 'maxlength="40" placeholder="leer = Rechnungsdatum"')) : ''}
         </div>
         ${!contacts.length && customer ? '<div class="alert info">Noch keine Kunden vorhanden – lege sie zuerst unter <a href="#/contacts">Kontakte</a> an.</div>' : ''}
         <div class="table-wrap"><table class="items-table">
@@ -1962,6 +1970,7 @@
         date: fd.date,
         dueDate: kind === 'purchase' ? '' : fd.dueDate,
         reference: (fd.reference || '').trim(),
+        serviceDate: customer ? (fd.serviceDate || '').trim() : '',
         notes: fd.notes || '',
         items: doc.items
           .filter((it) => String(it.text || '').trim() || it.articleId)
@@ -2043,7 +2052,7 @@
         on('dv-paid', () => {
           openModal({
             title: `Zahlung erfassen · ${doc.number}`,
-            body: `<p>Betrag: <b>${money(t.gross)}</b> – es wird automatisch eine ${doc.kind === 'sale' ? 'Einnahme' : 'Ausgabe'} im Kassenbuch erstellt.</p>
+            body: `<p>Betrag: <b>${money(t.gross)}</b> – es wird automatisch eine ${doc.kind === 'sale' ? 'Einnahme' : 'Ausgabe'} im Kassabuch erstellt.</p>
               <div class="grid2">${field('Zahlungsdatum', inp('date', today(), 'type="date" required'))}${field('Zahlungsart', selectEl('method', METHODS.map((m) => [m, m]), 'Bank'))}</div>`,
             submit: 'Zahlung buchen',
             onSubmit(fd) {
@@ -2068,11 +2077,13 @@
     const meta = reminder
       ? [`Datum: ${fmtDate(today())}`, `Rechnung ${esc(doc.number)} vom ${fmtDate(doc.date)}`, `fällig seit ${fmtDate(doc.dueDate)}`]
       : [`${dateLabel}: ${fmtDate(doc.date)}`,
+        doc.kind === 'sale' ? `Leistungsdatum: ${doc.serviceDate ? esc(doc.serviceDate) : 'entspricht Rechnungsdatum'}` : '',
+        doc.kind === 'quote' && doc.serviceDate ? `Leistungszeitraum: ${esc(doc.serviceDate)}` : '',
         doc.kind === 'sale' && doc.dueDate ? `Zahlbar bis: ${fmtDate(doc.dueDate)}` : '',
         doc.kind === 'quote' && doc.dueDate ? `Gültig bis: ${fmtDate(doc.dueDate)}` : '',
         doc.reference ? `${doc.kind === 'quote' ? 'Betreff' : 'Referenz'}: ${esc(doc.reference)}` : ''];
     if (c.number) meta.push(`Kunden-Nr.: ${esc(c.number)}`);
-    if (c.vatId) meta.push(`USt-IdNr. Kunde: ${esc(c.vatId)}`);
+    if (c.vatId) meta.push(`UID-Nr. Kunde: ${esc(c.vatId)}`);
     const reminderText = reminder ? `<p style="margin-top:18px">Sehr geehrte Damen und Herren,</p>
       <p>sicher ist es Ihrer Aufmerksamkeit entgangen: Unsere Rechnung <b>${esc(doc.number)}</b> vom ${fmtDate(doc.date)} über <b>${money(t.gross)}</b> war am ${fmtDate(doc.dueDate)} fällig.
       Bitte überweisen Sie den offenen Betrag bis zum <b>${fmtDate(addDays(today(), 7))}</b>. Sollten Sie bereits bezahlt haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.</p>` : '';
@@ -2085,7 +2096,7 @@
           ${c.contactPerson ? `<div>${esc(c.contactPerson)}</div>` : ''}
           <div>${esc(c.street || '')}</div>
           <div>${esc([c.zip, c.city].filter(Boolean).join(' '))}</div>
-          ${c.country && c.country !== 'Deutschland' ? `<div>${esc(c.country)}</div>` : ''}
+          ${c.country && c.country !== 'Österreich' ? `<div>${esc(c.country)}</div>` : ''}
         </div>
         <div style="text-align:right">
           <div class="p-firm">${esc(firm)}</div>
@@ -2099,12 +2110,12 @@
       <table><thead><tr><th>Pos.</th><th>Beschreibung</th><th class="num">Menge</th><th class="num">Einzelpreis</th><th class="num">USt</th><th class="num">Gesamt</th></tr></thead>
         <tbody>${doc.items.map((it, i) => `<tr><td>${i + 1}</td><td>${esc(it.text)}</td><td class="num">${fmtNum(it.qty)} ${esc(it.unit || '')}</td><td class="num">${money(it.price)}</td><td class="num">${num(it.tax)} %</td><td class="num">${money(num(it.qty) * num(it.price))}</td></tr>`).join('')}</tbody></table>
       ${totalsHtml(t)}
-      ${s.smallBusiness && customer ? '<p style="margin-top:16px">Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.</p>' : ''}
+      ${s.smallBusiness && customer ? '<p style="margin-top:16px">Umsatzsteuerfrei aufgrund der Kleinunternehmerregelung gemäß § 6 Abs. 1 Z 27 UStG.</p>' : ''}
       ${doc.notes && !reminder ? `<p style="margin-top:16px;white-space:pre-wrap">${esc(doc.notes)}</p>` : ''}
       ${footerText ? `<p style="margin-top:16px;white-space:pre-wrap">${esc(footerText)}</p>` : ''}
       <div class="p-foot">
-        <div><b>${esc(firm)}</b><br>${esc(s.street || '')}<br>${esc([s.zip, s.city].filter(Boolean).join(' '))}</div>
-        <div>${s.taxNumber ? `Steuernummer: ${esc(s.taxNumber)}<br>` : ''}${s.vatId ? `USt-IdNr.: ${esc(s.vatId)}<br>` : ''}${s.owner ? `Inhaber/GF: ${esc(s.owner)}` : ''}</div>
+        <div><b>${esc(firm)}</b>${s.legalForm && !String(firm).includes(s.legalForm.split(' ')[0]) && !/^(Einzelunternehmen|Neue Selbst)/.test(s.legalForm) ? ` · ${esc(s.legalForm.split(' (')[0])}` : ''}<br>${esc(s.street || '')}<br>${esc([s.zip, s.city].filter(Boolean).join(' '))}${s.fbNumber ? `<br>${esc(s.fbNumber)}` : ''}</div>
+        <div>${s.taxNumber ? `Steuernummer: ${esc(s.taxNumber)}<br>` : ''}${s.vatId ? `UID-Nr.: ${esc(s.vatId)}<br>` : ''}${s.owner ? `Inhaber/GF: ${esc(s.owner)}` : ''}</div>
         <div>${s.bank ? `${esc(s.bank)}<br>` : ''}${s.iban ? `IBAN: ${esc(s.iban)}<br>` : ''}${s.bic ? `BIC: ${esc(s.bic)}` : ''}</div>
       </div>
     </div>`;
@@ -2225,7 +2236,7 @@
     const inv = put('documents', {
       kind: 'sale', status: 'draft', date: today(), dueDate: addDays(today(), num(s.paymentDays) || 14),
       contactId, contact: { name: c.name, contactPerson: c.contactPerson, street: c.street, zip: c.zip, city: c.city, country: c.country, vatId: c.vatId, number: c.number },
-      items: list.map((t) => ({ articleId: '', text: `${fmtDate(t.date)} – ${t.project ? `${t.project}: ` : ''}${t.description}`, qty: r2(num(t.minutes) / 60), price: num(t.rate), tax: s.smallBusiness ? 0 : 19, unit: 'Std' })),
+      items: list.map((t) => ({ articleId: '', text: `${fmtDate(t.date)} – ${t.project ? `${t.project}: ` : ''}${t.description}`, qty: r2(num(t.minutes) / 60), price: num(t.rate), tax: s.smallBusiness ? 0 : 20, unit: 'Std' })),
       notes: '', reference: '',
     });
     for (const t of list) put('times', { ...t, billedDocId: inv.id });
@@ -2287,7 +2298,7 @@
 
   function openMember(id) {
     const m = id ? get('contacts', id) : null;
-    const d = m || { status: 'active', joinedAt: today(), feeInterval: 'year', fee: '', country: 'Deutschland' };
+    const d = m || { status: 'active', joinedAt: today(), feeInterval: 'year', fee: '', country: 'Österreich' };
     const groups = [...new Set(members().map((x) => x.feeGroup).filter(Boolean)), 'Erwachsene', 'Jugendliche', 'Familie', 'Fördermitglied', 'Ehrenmitglied'];
     openModal({
       title: m ? m.name : 'Neues Mitglied',
@@ -2340,7 +2351,7 @@
   // =============================================================== Ansicht: Verein – Beiträge
   function periodsFor(year, interval) {
     const y = String(year);
-    if (interval === 'month') return Array.from({ length: 12 }, (_, i) => [`${y}-${pad(i + 1)}`, new Date(Number(y), i, 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }), `${y}-${pad(i + 1)}-01`, `${y}-${pad(i + 1)}-${pad(new Date(Number(y), i + 1, 0).getDate())}`]);
+    if (interval === 'month') return Array.from({ length: 12 }, (_, i) => [`${y}-${pad(i + 1)}`, new Date(Number(y), i, 1).toLocaleDateString('de-AT', { month: 'long', year: 'numeric' }), `${y}-${pad(i + 1)}-01`, `${y}-${pad(i + 1)}-${pad(new Date(Number(y), i + 1, 0).getDate())}`]);
     if (interval === 'quarter') return [1, 2, 3, 4].map((q) => [`${y}-Q${q}`, `${q}. Quartal ${y}`, `${y}-${pad((q - 1) * 3 + 1)}-01`, `${y}-${pad(q * 3)}-${pad(new Date(Number(y), q * 3, 0).getDate())}`]);
     if (interval === 'half') return [[`${y}-H1`, `1. Halbjahr ${y}`, `${y}-01-01`, `${y}-06-30`], [`${y}-H2`, `2. Halbjahr ${y}`, `${y}-07-01`, `${y}-12-31`]];
     return [[y, `Jahresbeitrag ${y}`, `${y}-01-01`, `${y}-12-31`]];
@@ -2449,8 +2460,8 @@
     if (!list.length) return;
     openModal({
       title: list.length === 1 ? `Beitrag bezahlt · ${list[0].memberName}` : `${list.length} Beiträge als bezahlt buchen`,
-      body: `<p>${list.length === 1 ? `${esc(list[0].periodLabel)}: <b>${money(list[0].amount)}</b>` : `Summe: <b>${money(sum(list, (d) => d.amount))}</b>`} – wird als Einnahme „Mitgliedsbeiträge“ (ideeller Bereich) ins Kassenbuch gebucht.</p>
-        <div class="grid2">${field('Zahlungsdatum', inp('date', today(), 'type="date" required'))}${field('Zahlungsart', selectEl('method', [['Lastschrift', 'Lastschrift'], ...METHODS.map((m) => [m, m])], 'Lastschrift'))}</div>`,
+      body: `<p>${list.length === 1 ? `${esc(list[0].periodLabel)}: <b>${money(list[0].amount)}</b>` : `Summe: <b>${money(sum(list, (d) => d.amount))}</b>`} – wird als Einnahme „Mitgliedsbeiträge“ (ideeller Bereich) ins Kassabuch gebucht.</p>
+        <div class="grid2">${field('Zahlungsdatum', inp('date', today(), 'type="date" required'))}${field('Zahlungsart', selectEl('method', [['Bankeinzug', 'Bankeinzug'], ...METHODS.map((m) => [m, m])], 'Bankeinzug'))}</div>`,
       submit: 'Buchen',
       onSubmit(fd) {
         for (const d of list) markDuePaid(d, fd.date, fd.method);
@@ -2459,45 +2470,60 @@
     });
   }
 
-  // =============================================================== Ansicht: Verein – Spenden & Zuwendungsbestätigungen
+  // =============================================================== Ansicht: Verein – Spenden (Österreich)
+  // Spendenabsetzbarkeit: Verein auf der BMF-Liste begünstigter Spendenempfänger; Spenden werden mit
+  // Vor-/Zuname und Geburtsdatum jährlich an das Finanzamt gemeldet (§ 18 Abs. 8 EStG).
   const DON_KINDS = { money: 'Geldspende', goods: 'Sachspende' };
+  const donorFull = (d) => [d.donorFirst, d.donorLast].filter(Boolean).join(' ') || d.donorName || 'Anonym';
+  const canReport = (d) => d.kind !== 'goods' && !d.noTransfer && !d.donorCompany && !!d.donorBirth && !!(d.donorFirst || '').trim() && !!(d.donorLast || '').trim();
+
+  const needsData = (d) => d.kind !== 'goods' && !d.noTransfer && !d.donorCompany && !canReport(d);
+
   function viewDonations() {
     const all_ = all('donations');
+    const s = settings();
     const years = [...new Set([today().slice(0, 4), ...all_.map((d) => String(d.date).slice(0, 4))])].sort().reverse();
     if (!UI.q.donYear) UI.q.donYear = today().slice(0, 4);
     let list = all_.filter((d) => String(d.date).startsWith(UI.q.donYear)).sort(byDateDesc);
     const yearList = list;
-    if (UI.q.donStatus === 'noreceipt') list = list.filter((d) => !d.receiptNo);
+    if (UI.q.donStatus === 'report') list = list.filter(canReport);
+    if (UI.q.donStatus === 'missing') list = list.filter(needsData);
     const q = (UI.q.don || '').toLowerCase();
-    if (q) list = list.filter((d) => [d.donorName, d.receiptNo, d.note, d.goodsDesc].join(' ').toLowerCase().includes(q));
-    const missing = !settings().taxOffice || !settings().exemptionDate || !settings().purposes;
+    if (q) list = list.filter((d) => [donorFull(d), d.receiptNo, d.note, d.goodsDesc].join(' ').toLowerCase().includes(q));
+    const money_ = yearList.filter((d) => d.kind !== 'goods');
+    const missing = money_.filter(needsData);
     return `
-      ${missing && settings().nonProfit !== false ? `<div class="hint-bar warn">${icon('alert', 16)}<span>Für Zuwendungsbestätigungen fehlen Angaben zum Freistellungsbescheid (Finanzamt, Datum, Zwecke).</span><a class="btn sm ghost" href="#/settings" data-action="set-ui" data-k="setTab" data-v="org">Ergänzen</a></div>` : ''}
+      ${s.donationRegNo ? '' : `<div class="hint-bar warn">${icon('alert', 16)}<span>Keine Registrierungsnummer der Spendenbegünstigung hinterlegt – ohne Eintrag in der BMF-Liste sind Spenden nicht absetzbar.</span><a class="btn sm ghost" href="#/settings" data-action="set-ui" data-k="setTab" data-v="org">Ergänzen</a></div>`}
       <div class="kpis">
         ${kpi(`Spenden ${UI.q.donYear}`, money(sum(yearList, (d) => d.amount)), 'pos', `${yearList.length} Spenden`, 'gift')}
-        ${kpi('Spender', fmtNum(new Set(yearList.map((d) => d.donorId || d.donorName)).size), '', 'im Jahr', 'users')}
-        ${kpi('Sachspenden', money(sum(yearList.filter((d) => d.kind === 'goods'), (d) => d.amount)), '', `${yearList.filter((d) => d.kind === 'goods').length} Stück`, 'gift')}
-        ${kpi('Ohne Bestätigung', fmtNum(yearList.filter((d) => !d.receiptNo && d.amount > 0).length), yearList.some((d) => !d.receiptNo) ? 'neg' : 'pos', 'Zuwendungsbestätigung offen', 'receipt')}
+        ${kpi('Spender:innen', fmtNum(new Set(yearList.map((d) => d.donorId || donorFull(d))).size), '', 'im Jahr', 'users')}
+        ${kpi('Für Spendenmeldung', money(sum(money_.filter(canReport), (d) => d.amount)), '', `${new Set(money_.filter(canReport).map((d) => `${d.donorFirst}|${d.donorLast}|${d.donorBirth}`)).size} mit Geburtsdatum`, 'receipt')}
+        ${kpi('Daten fehlen', fmtNum(missing.length), missing.length ? 'neg' : 'pos', 'Vor-/Zuname oder Geburtsdatum', 'alert')}
       </div>
       <div class="toolbar">
-        ${searchBox('don', 'Spender, Bestätigungs-Nr. …')}
+        ${searchBox('don', 'Spender:in, Bestätigungs-Nr. …')}
         ${uiSelect('donYear', years.map((y) => [y, y]))}
-        ${uiSelect('donStatus', [['', 'Alle'], ['noreceipt', 'Ohne Bestätigung']])}
-        <div class="actions"><button class="btn primary" data-action="new-donation">${icon('plus', 16)} Spende</button></div>
+        ${uiSelect('donStatus', [['', 'Alle'], ['report', 'Für Spendenmeldung'], ['missing', 'Daten fehlen']])}
+        <div class="actions">
+          <button class="btn" data-action="export" data-what="donation-report" title="Jahresliste zur Vorbereitung der Spendenmeldung">${icon('download', 16)} Jahresliste ${esc(UI.q.donYear)}</button>
+          <button class="btn primary" data-action="new-donation">${icon('plus', 16)} Spende</button>
+        </div>
       </div>
       <section class="card flush">
         ${list.length ? `<div class="table-wrap"><table>
-          <thead><tr><th>Datum</th><th>Spender</th><th>Art</th><th class="num">Betrag</th><th>Bestätigung</th><th></th></tr></thead>
+          <thead><tr><th>Datum</th><th>Spender:in</th><th>Art</th><th class="num">Betrag</th><th>Spendenmeldung</th><th>Bestätigung</th><th></th></tr></thead>
           <tbody>${list.map((d) => `<tr class="clickable" data-action="edit-donation" data-id="${d.id}">
-            <td>${fmtDate(d.date)}</td><td><b>${esc(d.donorName || 'Anonym')}</b>${d.donorCity ? `<span class="sub">${esc(d.donorCity)}</span>` : ''}</td>
-            <td><span class="badge ${d.kind === 'goods' ? 'warn' : 'paid'}">${DON_KINDS[d.kind] || 'Geldspende'}</span>${d.waiver ? ' <span class="badge">Aufwandsspende</span>' : ''}</td>
+            <td>${fmtDate(d.date)}</td><td><b>${esc(donorFull(d))}</b>${d.donorCity ? `<span class="sub">${esc(d.donorCity)}</span>` : ''}</td>
+            <td><span class="badge ${d.kind === 'goods' ? 'warn' : 'paid'}">${DON_KINDS[d.kind] || 'Geldspende'}</span></td>
             <td class="num"><b>${money(d.amount)}</b></td>
+            <td>${d.kind === 'goods' ? '<span class="muted">—</span>' : d.donorCompany ? '<span class="badge">Unternehmen</span>' : d.noTransfer ? '<span class="badge">untersagt</span>' : canReport(d) ? '<span class="badge ok">wird gemeldet</span>' : '<span class="badge overdue">Daten fehlen</span>'}</td>
             <td>${d.receiptNo ? `${esc(d.receiptNo)} <span class="muted small">${fmtDate(d.receiptDate)}</span>` : '<span class="muted">—</span>'}</td>
             <td class="actions"><button class="btn sm" data-action="print-receipt" data-id="${d.id}">${icon('print', 14)} Bestätigung</button></td></tr>`).join('')}</tbody>
-          <tfoot><tr><td colspan="3">${list.length} Spenden</td><td class="num">${money(sum(list, (d) => d.amount))}</td><td colspan="2"></td></tr></tfoot>
+          <tfoot><tr><td colspan="3">${list.length} Spenden</td><td class="num">${money(sum(list, (d) => d.amount))}</td><td colspan="3"></td></tr></tfoot>
         </table></div>`
         : empty('gift', all_.length ? 'Keine Spenden für diesen Filter.' : 'Noch keine Spenden erfasst.', all_.length ? '' : `<button class="btn primary" data-action="new-donation">${icon('plus', 16)} Erste Spende erfassen</button>`)}
-      </section>`;
+      </section>
+      <p class="muted small">Spendenmeldung: Begünstigte Organisationen übermitteln die Jahressumme je Spender:in (mit Vor-/Zuname und Geburtsdatum) bis Ende Februar des Folgejahres an das Finanzamt. Die Jahresliste dient zur Vorbereitung – die Übermittlung selbst erfolgt über FinanzOnline. Keine Steuerberatung.</p>`;
   }
 
   function openDonation(id) {
@@ -2505,44 +2531,56 @@
     const d = d0 || { date: today(), kind: 'money', method: 'Bank' };
     const donors = [...members().filter((m) => m.status !== 'left'), ...all('contacts').filter((c) => c.type !== 'member').sort(byName)];
     openModal({
-      title: d0 ? `Spende · ${d0.donorName || 'Anonym'}` : 'Neue Spende',
-      body: `${d0 && d0.receiptNo ? `<div class="alert info">Zuwendungsbestätigung ${esc(d0.receiptNo)} wurde am ${fmtDate(d0.receiptDate)} erstellt. Änderungen erfordern ggf. eine neue Bestätigung.</div>` : ''}
+      title: d0 ? `Spende · ${donorFull(d0)}` : 'Neue Spende',
+      body: `${d0 && d0.receiptNo ? `<div class="alert info">Spendenbestätigung ${esc(d0.receiptNo)} wurde am ${fmtDate(d0.receiptDate)} erstellt.</div>` : ''}
         <div class="grid2">
-          ${field('Spender aus Mitgliedern / Kontakten', `<select name="donorId"><option value="">— neuer Spender / freie Eingabe —</option>${donors.map((c) => `<option value="${c.id}" ${c.id === d.donorId ? 'selected' : ''}>${esc(c.name)}${c.type === 'member' ? ' (Mitglied)' : ''}</option>`).join('')}</select>`, 'span2')}
-          ${field('Name des Spenders', inp('donorName', d.donorName, 'required maxlength="160"'), 'span2')}
+          ${field('Spender:in aus Mitgliedern / Kontakten', `<select name="donorId"><option value="">— neue Person / freie Eingabe —</option>${donors.map((c) => `<option value="${c.id}" ${c.id === d.donorId ? 'selected' : ''}>${esc(c.name)}${c.type === 'member' ? ' (Mitglied)' : ''}</option>`).join('')}</select>`, 'span2')}
+          ${field('Vorname', inp('donorFirst', d.donorFirst ?? '', 'maxlength="80" autocomplete="off"'))}
+          ${field('Zuname / Firma', inp('donorLast', d.donorLast ?? d.donorName ?? '', 'required maxlength="120" autocomplete="off"'))}
+          ${field('Geburtsdatum (für die Spendenmeldung)', inp('donorBirth', d.donorBirth, 'type="date"'), 'only-money only-person')}
+          <div class="only-money" style="align-self:end;padding-bottom:6px;display:grid;gap:4px">
+            <label class="check"><input type="checkbox" name="donorCompany" ${d.donorCompany ? 'checked' : ''}> Spende eines Unternehmens</label>
+            <label class="check"><input type="checkbox" name="noTransfer" ${d.noTransfer ? 'checked' : ''}> Übermittlung ans Finanzamt untersagt</label>
+          </div>
           ${field('Straße & Hausnr.', inp('donorStreet', d.donorStreet, 'maxlength="120"'), 'span2')}
           ${field('PLZ', inp('donorZip', d.donorZip, 'maxlength="12"'))}
           ${field('Ort', inp('donorCity', d.donorCity, 'maxlength="80"'))}
-          ${field('Datum der Zuwendung', inp('date', d.date, 'type="date" required'))}
+          ${field('Datum der Spende', inp('date', d.date, 'type="date" required'))}
           ${field('Art', selectEl('kind', Object.entries(DON_KINDS), d.kind))}
           ${field('Betrag / Wert (€)', numInp('amount', d.amount ?? '', 'required min="0.01"'))}
           ${field('Eingang über', selectEl('method', METHODS.map((m) => [m, m]), d.method || 'Bank'), 'only-money')}
           ${field('Beschreibung der Sachspende', inp('goodsDesc', d.goodsDesc, 'maxlength="200" placeholder="z. B. 10 Trainingsbälle, neuwertig"'), 'span2 only-goods')}
-          ${field('Grundlage der Wertermittlung', inp('goodsBasis', d.goodsBasis, 'maxlength="200" placeholder="z. B. Rechnung vom …"'), 'span2 only-goods')}
-          <label class="check span2 only-money"><input type="checkbox" name="waiver" ${d.waiver ? 'checked' : ''}> Verzicht auf Erstattung von Aufwendungen (Aufwandsspende)</label>
           ${field('Notiz (intern)', inp('note', d.note, 'maxlength="200"'), 'span2')}
-        </div>`,
-      extra: d0 ? `<button type="button" class="btn danger" id="don-del">Löschen</button><button type="button" class="btn" id="don-print">${icon('print', 16)} Zuwendungsbestätigung</button>` : '',
+        </div>
+        <p class="muted small only-money">Für die steuerliche Absetzbarkeit braucht das Finanzamt Vor- und Zunamen sowie das Geburtsdatum, so wie im Ausweis. Spenden von Unternehmen sind Betriebsausgaben (§ 4a EStG) und werden nicht gemeldet.</p>`,
+      extra: d0 ? `<button type="button" class="btn danger" id="don-del">Löschen</button><button type="button" class="btn" id="don-print">${icon('print', 16)} Spendenbestätigung</button>` : '',
       onMount(f) {
         const kindSel = $('[name=kind]', f);
         const syncKind = () => {
           const goods = kindSel.value === 'goods';
           $$('.only-goods', f).forEach((el) => el.classList.toggle('hidden', !goods));
           $$('.only-money', f).forEach((el) => el.classList.toggle('hidden', goods));
+          // Firmenspenden werden nicht gemeldet – Geburtsdatum ausblenden
+          if (!goods && $('[name=donorCompany]', f).checked) $$('.only-person', f).forEach((el) => el.classList.add('hidden'));
         };
         kindSel.addEventListener('change', syncKind);
+        $('[name=donorCompany]', f).addEventListener('change', syncKind);
         syncKind();
         $('[name=donorId]', f).addEventListener('change', (e) => {
           const c = get('contacts', e.target.value);
           if (!c) return;
-          $('[name=donorName]', f).value = c.name || '';
+          // Mitglieder sind als „Zuname, Vorname“ gespeichert
+          const [last, first] = c.type === 'member' && c.name.includes(',') ? c.name.split(',').map((x) => x.trim()) : [c.name, ''];
+          $('[name=donorLast]', f).value = last || '';
+          $('[name=donorFirst]', f).value = first || '';
+          if (c.birthday) $('[name=donorBirth]', f).value = c.birthday;
           $('[name=donorStreet]', f).value = c.street || '';
           $('[name=donorZip]', f).value = c.zip || '';
           $('[name=donorCity]', f).value = c.city || '';
         });
         const delBtn = $('#don-del', f);
         if (delBtn) delBtn.addEventListener('click', () => {
-          if (!confirm('Spende löschen? Die zugehörige Buchung im Kassenbuch wird ebenfalls entfernt.')) return;
+          if (!confirm('Spende löschen? Die zugehörige Buchung im Kassabuch wird ebenfalls entfernt.')) return;
           if (d0.entryId && get('entries', d0.entryId)) del('entries', d0.entryId);
           del('donations', d0.id); closeModal(); render(); toast('Spende gelöscht');
         });
@@ -2554,15 +2592,18 @@
         if (amount <= 0) throw new Error('Bitte einen Betrag angeben.');
         const goods = fd.kind === 'goods';
         const data = {
-          ...(d0 || {}), donorId: fd.donorId || '', donorName: fd.donorName.trim(), donorStreet: fd.donorStreet.trim(), donorZip: fd.donorZip.trim(), donorCity: fd.donorCity.trim(),
+          ...(d0 || {}), donorId: fd.donorId || '', donorFirst: fd.donorFirst.trim(), donorLast: fd.donorLast.trim(),
+          donorStreet: fd.donorStreet.trim(), donorZip: fd.donorZip.trim(), donorCity: fd.donorCity.trim(),
+          donorBirth: goods || fd.donorCompany === 'on' ? '' : fd.donorBirth || '', noTransfer: !goods && fd.noTransfer === 'on', donorCompany: !goods && fd.donorCompany === 'on',
           date: fd.date, kind: goods ? 'goods' : 'money', amount: r2(amount), method: goods ? '' : fd.method,
-          goodsDesc: goods ? fd.goodsDesc.trim() : '', goodsBasis: goods ? fd.goodsBasis.trim() : '', waiver: !goods && fd.waiver === 'on', note: fd.note.trim(),
+          goodsDesc: goods ? fd.goodsDesc.trim() : '', note: fd.note.trim(),
         };
+        data.donorName = donorFull(data);
         const saved = put('donations', data);
-        // Geldspenden landen im Kassenbuch (Sachspenden sind kein Zahlungseingang)
+        // Geldspenden landen im Kassabuch (Sachspenden sind kein Zahlungseingang)
         if (!goods) {
           const old = data.entryId ? get('entries', data.entryId) : null;
-          const entry = put('entries', { ...(old || {}), date: data.date, kind: 'income', category: 'Spenden', sphere: 'ideell', description: `Spende · ${data.donorName || 'Anonym'}`, net: data.amount, tax: 0, gross: data.amount, rate: 0, method: data.method, ref: data.receiptNo || '', donationId: saved.id });
+          const entry = put('entries', { ...(old || {}), date: data.date, kind: 'income', category: 'Spenden', sphere: 'ideell', description: `Spende · ${data.donorName}`, net: data.amount, tax: 0, gross: data.amount, rate: 0, method: data.method, ref: data.receiptNo || '', donationId: saved.id });
           if (data.entryId !== entry.id) put('donations', { ...saved, entryId: entry.id });
         } else if (data.entryId && get('entries', data.entryId)) {
           del('entries', data.entryId);
@@ -2573,57 +2614,50 @@
     });
   }
 
-  // Betrag in Worten (für Zuwendungsbestätigungen)
-  function inWords(value) {
-    const ones = ['null', 'eins', 'zwei', 'drei', 'vier', 'fünf', 'sechs', 'sieben', 'acht', 'neun', 'zehn', 'elf', 'zwölf', 'dreizehn', 'vierzehn', 'fünfzehn', 'sechzehn', 'siebzehn', 'achtzehn', 'neunzehn'];
-    const tens = ['', '', 'zwanzig', 'dreißig', 'vierzig', 'fünfzig', 'sechzig', 'siebzig', 'achtzig', 'neunzig'];
-    const lead = (n) => (n === 1 ? 'ein' : words(n));
-    function words(n) {
-      if (n < 20) return ones[n];
-      if (n < 100) { const u = n % 10; return (u ? `${u === 1 ? 'ein' : ones[u]}und` : '') + tens[Math.floor(n / 10)]; }
-      if (n < 1000) { const r = n % 100; return `${lead(Math.floor(n / 100))}hundert${r ? words(r) : ''}`; }
-      if (n < 1e6) { const r = n % 1000; return `${lead(Math.floor(n / 1000))}tausend${r ? words(r) : ''}`; }
-      const mio = Math.floor(n / 1e6); const r = n % 1e6;
-      return `${mio === 1 ? 'eine Million' : `${words(mio)} Millionen`}${r ? ` ${words(r)}` : ''}`;
-    }
-    const euros = Math.floor(r2(value));
-    const cents = Math.round((r2(value) - euros) * 100);
-    return `${words(euros)} Euro${cents ? ` und ${words(cents)} Cent` : ''}`;
-  }
-
   function printDonationReceipt(d) {
     if (!d) return;
     const s = settings();
     if (!d.receiptNo) {
       const y = String(d.date).slice(0, 4);
       let max = 0;
-      for (const x of all('donations')) { const m = /^ZB-(\d{4})-(\d+)$/.exec(x.receiptNo || ''); if (m && m[1] === y) max = Math.max(max, Number(m[2])); }
-      d = put('donations', { ...d, receiptNo: `ZB-${y}-${String(max + 1).padStart(4, '0')}`, receiptDate: today() });
+      for (const x of all('donations')) { const m = /^SB-(\d{4})-(\d+)$/.exec(x.receiptNo || ''); if (m && m[1] === y) max = Math.max(max, Number(m[2])); }
+      d = put('donations', { ...d, receiptNo: `SB-${y}-${String(max + 1).padStart(4, '0')}`, receiptDate: today() });
       if (d.entryId && get('entries', d.entryId)) put('entries', { ...get('entries', d.entryId), ref: d.receiptNo });
       render();
     }
     const org = s.name || companyName();
     const goods = d.kind === 'goods';
-    const box = (on) => `<span class="p-box">${on ? '✕' : ''}</span>`;
+    const year = String(d.date).slice(0, 4);
+    const taxNote = goods
+      ? 'Sachspenden von Privatpersonen sind in der Regel nicht als Sonderausgabe absetzbar und werden nicht an das Finanzamt übermittelt.'
+      : !s.donationRegNo
+        ? 'Hinweis: Unser Verein ist nicht in der Liste der begünstigten Spendenempfänger eingetragen; die Spende ist daher steuerlich nicht absetzbar.'
+        : d.donorCompany
+          ? 'Spenden aus dem Betriebsvermögen sind im Rahmen des § 4a EStG als Betriebsausgabe abzugsfähig. Eine Übermittlung an das Finanzamt erfolgt nicht.'
+        : d.noTransfer
+          ? 'Sie haben die Übermittlung an das Finanzamt untersagt. Die Spende kann daher nicht als Sonderausgabe berücksichtigt werden.'
+          : canReport(d)
+            ? `Sie haben uns Ihren Vor- und Zunamen sowie Ihr Geburtsdatum bekanntgegeben. Wir übermitteln die Summe Ihrer Spenden des Jahres ${year} an das Finanzamt; sie wird automatisch in Ihrer Arbeitnehmerveranlagung bzw. Einkommensteuererklärung berücksichtigt (§ 18 Abs. 8 EStG).`
+            : 'Damit Ihre Spende steuerlich berücksichtigt werden kann, benötigen wir Ihren Vor- und Zunamen sowie Ihr Geburtsdatum (§ 18 Abs. 8 EStG). Bitte teilen Sie uns diese Angaben mit.';
     $('#print-root').innerHTML = `<div class="print-doc receipt">
-      <div class="p-sender">${esc([org, s.street, [s.zip, s.city].filter(Boolean).join(' ')].filter(Boolean).join(' · '))}</div>
-      <h2>Bestätigung über ${goods ? 'Sachzuwendungen' : 'Geldzuwendungen'}</h2>
-      <p class="p-small">im Sinne des § 10b des Einkommensteuergesetzes an eine der in § 5 Abs. 1 Nr. 9 des Körperschaftsteuergesetzes bezeichneten Körperschaften, Personenvereinigungen oder Vermögensmassen</p>
-      <div class="p-field"><span>Name und Anschrift des Zuwendenden</span><b>${esc(d.donorName || '')}</b><br>${esc(d.donorStreet || '')}<br>${esc([d.donorZip, d.donorCity].filter(Boolean).join(' '))}</div>
+      <div class="p-head">
+        <div><div class="p-sender">${esc([org, s.street, [s.zip, s.city].filter(Boolean).join(' ')].filter(Boolean).join(' · '))}</div>
+          <div><b>${esc(donorFull(d))}</b></div><div>${esc(d.donorStreet || '')}</div><div>${esc([d.donorZip, d.donorCity].filter(Boolean).join(' '))}</div></div>
+        <div style="text-align:right"><div class="p-firm">${esc(org)}</div><div>${esc(s.street || '')}</div><div>${esc([s.zip, s.city].filter(Boolean).join(' '))}</div>
+          ${s.register ? `<div>ZVR-Zahl ${esc(s.register)}</div>` : ''}${s.donationRegNo ? `<div>Spendenbegünstigung Reg.-Nr. ${esc(s.donationRegNo)}</div>` : ''}</div>
+      </div>
+      <h2>Spendenbestätigung</h2>
+      <p class="p-small">Nr. ${esc(d.receiptNo)} · ausgestellt am ${fmtDate(d.receiptDate || today())}</p>
       <table class="p-grid"><tr>
-        <td><span>${goods ? 'Wert der Zuwendung' : 'Betrag der Zuwendung'} – in Ziffern –</span><b>${money(d.amount)}</b></td>
-        <td><span>– in Buchstaben –</span><b>${esc(inWords(d.amount))}</b></td>
-        <td><span>Tag der Zuwendung</span><b>${fmtDate(d.date)}</b></td></tr></table>
-      ${goods ? `<div class="p-field"><span>Genaue Bezeichnung der Sachzuwendung mit Alter, Zustand, Kaufpreis usw.</span><b>${esc(d.goodsDesc || '')}</b></div>
-        <p>${box(false)} Die Sachzuwendung stammt nach den Angaben des Zuwendenden aus dem Privatvermögen.</p>
-        <p>Geeignete Unterlagen, die zur Wertermittlung gedient haben, liegen vor: ${esc(d.goodsBasis || '—')}</p>`
-        : `<p>Es handelt sich um den Verzicht auf Erstattung von Aufwendungen: Ja ${box(d.waiver)} Nein ${box(!d.waiver)}</p>`}
-      <p>${box(true)} Wir sind wegen Förderung <b>${esc(s.purposes || '…')}</b> nach dem Freistellungsbescheid bzw. nach der Anlage zum Körperschaftsteuerbescheid des Finanzamtes <b>${esc(s.taxOffice || '…')}</b>, StNr. <b>${esc(s.taxNumber || '…')}</b>, vom <b>${fmtDate(s.exemptionDate) || '…'}</b> nach § 5 Abs. 1 Nr. 9 des Körperschaftsteuergesetzes von der Körperschaftsteuer und nach § 3 Nr. 6 des Gewerbesteuergesetzes von der Gewerbesteuer befreit.</p>
-      <p>Es wird bestätigt, dass die Zuwendung nur zur Förderung <b>${esc(s.purposes || '…')}</b> verwendet wird.</p>
-      <div class="p-sign"><div>${esc(s.city || '')}, ${fmtDate(d.receiptDate || today())}</div><div class="p-line">(Ort, Datum und Unterschrift des Zuwendungsempfängers)</div></div>
-      <p class="p-small"><b>Hinweis:</b> Wer vorsätzlich oder grob fahrlässig eine unrichtige Zuwendungsbestätigung erstellt oder veranlasst, dass Zuwendungen nicht zu den in der Zuwendungsbestätigung angegebenen steuerbegünstigten Zwecken verwendet werden, haftet für die entgangene Steuer (§ 10b Abs. 4 EStG, § 9 Abs. 3 KStG, § 9 Nr. 5 GewStG).
-      Diese Bestätigung wird nicht als Nachweis für die steuerliche Berücksichtigung der Zuwendung anerkannt, wenn das Datum des Freistellungsbescheides länger als 5 Jahre bzw. das Datum der Feststellung der Einhaltung der satzungsmäßigen Voraussetzungen nach § 60a Abs. 1 AO länger als 3 Jahre seit Ausstellung des Bescheides zurückliegt (§ 63 Abs. 5 AO).</p>
-      <p class="p-small">Bestätigung Nr. ${esc(d.receiptNo)} · erstellt mit NEXCOUNT</p>
+        <td><span>Spender:in</span><b>${esc(donorFull(d))}</b></td>
+        <td><span>${goods ? 'Sachspende – Wert lt. Angabe' : 'Geldspende – Betrag'}</span><b>${money(d.amount)}</b></td>
+        <td><span>Datum der Spende</span><b>${fmtDate(d.date)}</b></td></tr></table>
+      ${goods ? `<div class="p-field"><span>Bezeichnung der Sachspende</span><b>${esc(d.goodsDesc || '')}</b></div>` : ''}
+      <p>Wir bestätigen den Erhalt der oben angeführten ${goods ? 'Sachspende' : 'Geldspende'} und danken herzlich für Ihre Unterstützung.
+        Die Spende wird ausschließlich für unsere begünstigten Zwecke${s.purposes ? ` (<b>${esc(s.purposes)}</b>)` : ''} verwendet.</p>
+      <p>${esc(taxNote)}</p>
+      <div class="p-sign"><div>${esc(s.city || '')}, ${fmtDate(d.receiptDate || today())}</div><div class="p-line">Unterschrift für ${esc(org)}</div></div>
+      <p class="p-small">Erstellt mit NEXCOUNT</p>
     </div>`;
     document.body.classList.add('printing');
     const done = () => { document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
@@ -2631,7 +2665,7 @@
     setTimeout(() => { window.print(); setTimeout(done, 1000); }, 50);
   }
 
-  // =============================================================== Ansicht: Buchungen (Kassenbuch)
+  // =============================================================== Ansicht: Buchungen (Kassabuch)
   function viewEntries() {
     if (UI.q.entMonth === undefined) UI.q.entMonth = today().slice(0, 7);
     const allE = all('entries');
@@ -2644,12 +2678,19 @@
     const inc = sum(list.filter((e) => e.kind === 'income'), (e) => e.gross);
     const exp = sum(list.filter((e) => e.kind === 'expense'), (e) => e.gross);
     const bal = (m) => sum(allE.filter((e) => e.method === m), (e) => (e.kind === 'income' ? 1 : -1) * num(e.gross));
+    // Registrierkassenpflicht (§ 131b BAO): ab 15.000 € Jahresumsatz, davon mehr als 7.500 € bar (inkl. Bankomat/Kreditkarte)
+    const yearInc = allE.filter((e) => e.kind === 'income' && String(e.date || '').startsWith(today().slice(0, 4)));
+    const cashInc = sum(yearInc.filter((e) => ['Kassa', 'Kasse', 'Bankomat', 'Kreditkarte'].includes(e.method)), (e) => e.net);
+    const rkHint = !isClub() && cashInc > 5000
+      ? `<div class="hint-bar ${cashInc > 7500 ? 'warn' : ''}">${icon('alert', 16)}<span>Barumsätze ${today().slice(0, 4)}: ${money(cashInc)} netto. Ab 15.000 € Jahresumsatz, davon über 7.500 € bar (auch Bankomat/Kreditkarte), gilt die Registrierkassenpflicht (§ 131b BAO). NEXCOUNT ist keine Registrierkasse nach RKSV – Barumsätze bitte mit einer zertifizierten Kassa erfassen und hier als Tageslosung buchen.</span></div>`
+      : '';
     return `
+      ${rkHint}
       <div class="kpis">
         ${kpi('Einnahmen (brutto)', money(inc), 'pos', UI.q.entMonth ? monthLabel(UI.q.entMonth) : 'gesamter Zeitraum')}
         ${kpi('Ausgaben (brutto)', money(exp), 'neg', UI.q.entMonth ? monthLabel(UI.q.entMonth) : 'gesamter Zeitraum')}
         ${kpi('Saldo', money(inc - exp), inc - exp >= 0 ? 'pos' : 'neg', `${list.length} Buchung(en)`)}
-        ${kpi('Bank / Kasse (gesamt)', `${money(bal('Bank'))}`, '', `Kasse: ${money(bal('Kasse'))}`)}
+        ${kpi('Bank / Kassa (gesamt)', `${money(bal('Bank'))}`, '', `Kassa: ${money(bal('Kassa') + bal('Kasse'))}`)}
       </div>
       <div class="toolbar">
         ${searchBox('ent', 'Beschreibung, Kategorie, Beleg …')}
@@ -2686,7 +2727,7 @@
     const e = id ? get('entries', id) : null;
     if (id && !e) return toast('Buchung nicht gefunden.', 'error');
     const club = isClub();
-    const d = e || { kind, date: today(), rate: settings().smallBusiness || club ? 0 : 19, method: 'Bank', category: catsFor(kind)[0], sphere: 'ideell' };
+    const d = e || { kind, date: today(), rate: settings().smallBusiness || club ? 0 : 20, method: 'Bank', category: catsFor(kind)[0], sphere: 'ideell' };
     const usedCats = all('entries').map((x) => x.category).filter(Boolean);
     const rateOpts = [...RATES, ...(d.rate == null && e ? [['mixed', 'gemischt']] : [])];
     openModal({
@@ -2776,7 +2817,7 @@
 
   function openContact(id) {
     const c = id ? get('contacts', id) : null;
-    const d = c || { type: 'customer', country: 'Deutschland' };
+    const d = c || { type: 'customer', country: 'Österreich' };
     openModal({
       title: c ? c.name : 'Neuer Kontakt',
       body: `<div class="grid2">
@@ -2786,7 +2827,7 @@
           ${field('Ansprechpartner', inp('contactPerson', d.contactPerson, 'maxlength="100"'))}
           ${field('E-Mail', inp('email', d.email, 'type="email" maxlength="120"'))}
           ${field('Telefon', inp('phone', d.phone, 'type="tel" maxlength="40"'))}
-          ${field('USt-IdNr.', inp('vatId', d.vatId, 'maxlength="30"'))}
+          ${field('UID-Nr.', inp('vatId', d.vatId, 'maxlength="30"'))}
           ${field('Straße & Hausnr.', inp('street', d.street, 'maxlength="120"'), 'span2')}
           ${field('PLZ', inp('zip', d.zip, 'maxlength="12"'))}
           ${field('Ort', inp('city', d.city, 'maxlength="80"'))}
@@ -2853,7 +2894,7 @@
     // Lager
     const st = stockMap();
     const arts = stockArticles();
-    // Verein: Kassenbericht nach Bereichen (Sphären)
+    // Verein: Kassabericht nach Bereichen (Sphären)
     const club = isClub();
     const smallBiz = !!settings().smallBusiness;
     const opening = sum(entries.filter((e) => e.date < from), (e) => (e.kind === 'income' ? 1 : -1) * num(e.gross));
@@ -2866,18 +2907,18 @@
     });
     const wgb = sphereRows.find((r) => r.k === 'wirtschaft');
     const clubReport = club ? `<div class="grid-2">
-        <section class="card"><div class="card-head"><h3>Kassenbericht</h3><button class="btn sm ghost" data-action="print-page">${icon('print', 14)} Drucken</button></div>
+        <section class="card"><div class="card-head"><h3>Kassabericht</h3><button class="btn sm ghost" data-action="print-page">${icon('print', 14)} Drucken</button></div>
           <table><tbody>
             <tr><td>Anfangsbestand ${fmtDate(from)}</td><td class="num">${money(opening)}</td></tr>
             <tr><td>+ Einnahmen</td><td class="num pos">${money(incG)}</td></tr>
             <tr><td>− Ausgaben</td><td class="num neg">${money(expG)}</td></tr>
           </tbody><tfoot><tr><td>Endbestand ${fmtDate(to)}</td><td class="num">${money(opening + incG - expG)}</td></tr></tfoot></table>
         </section>
-        <section class="card"><div class="card-head"><h3>Nach Bereichen (Sphären)</h3><span class="muted">brutto</span></div>
+        <section class="card"><div class="card-head"><h3>Nach Bereichen (BAO)</h3><span class="muted">brutto</span></div>
           <table><thead><tr><th>Bereich</th><th class="num">Einnahmen</th><th class="num">Ausgaben</th><th class="num">Ergebnis</th></tr></thead>
           <tbody>${sphereRows.map((r) => `<tr><td>${esc(r.label)}</td><td class="num">${money(r.i)}</td><td class="num">${money(r.x)}</td><td class="num ${r.i - r.x < 0 ? 'neg' : ''}">${money(r.i - r.x)}</td></tr>`).join('')}</tbody>
           <tfoot><tr><td>Gesamt</td><td class="num">${money(incG)}</td><td class="num">${money(expG)}</td><td class="num">${money(incG - expG)}</td></tr></tfoot></table>
-          <p class="muted small" style="margin-top:10px">Wirtschaftlicher Geschäftsbetrieb: ${money(wgb.i)} Einnahmen im Zeitraum. Bleiben die Einnahmen daraus im Jahr unter der Besteuerungsgrenze von 45.000 € (§ 64 Abs. 3 AO, Stand 2025), fallen keine Körperschaft- und Gewerbesteuer an. Keine Steuerberatung.</p>
+          <p class="muted small" style="margin-top:10px">Begünstigungsschädlicher Betrieb: ${money(wgb.i)} Einnahmen im Zeitraum. Bleiben die Umsätze daraus im Jahr unter 40.000 €, gilt die Ausnahmegenehmigung nach § 45a BAO automatisch und die Gemeinnützigkeit bleibt erhalten. Entbehrliche Hilfsbetriebe (z. B. kleine Vereinsfeste) und begünstigungsschädliche Betriebe sind körperschaftsteuerpflichtig – Freibetrag 10.000 € (§ 23 KStG, Stand 2025). Keine Steuerberatung.</p>
         </section>
       </div>` : '';
     const stockCats = {};
@@ -2888,7 +2929,7 @@
     const openSale = all('documents').filter((d) => d.kind === 'sale' && d.status === 'open');
     const openPurch = all('documents').filter((d) => d.kind === 'purchase' && d.status === 'open');
     const periodOpts = [['year', 'Gesamtjahr'], ['q1', '1. Quartal'], ['q2', '2. Quartal'], ['q3', '3. Quartal'], ['q4', '4. Quartal'],
-      ...Array.from({ length: 12 }, (_, i) => [`m${pad(i + 1)}`, new Date(2000, i, 1).toLocaleDateString('de-DE', { month: 'long' })])];
+      ...Array.from({ length: 12 }, (_, i) => [`m${pad(i + 1)}`, new Date(2000, i, 1).toLocaleDateString('de-AT', { month: 'long' })])];
     return `
       <div class="toolbar">
         ${uiSelect('repYear', years.map((y) => [y, y]))}
@@ -2901,11 +2942,11 @@
       </div>
       <div class="kpis">
         ${club ? `${kpi('Einnahmen', money(incG), 'pos', 'brutto', 'trendUp')}${kpi('Ausgaben', money(expG), 'neg', 'brutto', 'trendDown')}
-          ${kpi('Überschuss / Fehlbetrag', money(incG - expG), incG - expG >= 0 ? 'pos' : 'neg', 'im Zeitraum', 'wallet')}${kpi('Kassenstand', money(opening + incG - expG), '', `zum ${fmtDate(to)}`, 'book')}`
+          ${kpi('Überschuss / Fehlbetrag', money(incG - expG), incG - expG >= 0 ? 'pos' : 'neg', 'im Zeitraum', 'wallet')}${kpi('Kassastand', money(opening + incG - expG), '', `zum ${fmtDate(to)}`, 'book')}`
         : `${kpi('Betriebseinnahmen (netto)', money(incNet), 'pos', '', 'trendUp')}
         ${kpi('Betriebsausgaben (netto)', money(expNet), 'neg', '', 'trendDown')}
-        ${kpi('Gewinn / Verlust', money(incNet - expNet), incNet - expNet >= 0 ? 'pos' : 'neg', 'nach EÜR-Logik (Zufluss)', 'wallet')}
-        ${smallBiz ? kpi('Umsatzsteuer', 'entfällt', '', 'Kleinunternehmerregelung § 19 UStG', 'shield') : kpi('USt-Zahllast', money(ust - vst), ust - vst > 0 ? 'neg' : 'pos', `USt ${money(ust)} − Vorsteuer ${money(vst)}`, 'file')}`}
+        ${kpi('Gewinn / Verlust', money(incNet - expNet), incNet - expNet >= 0 ? 'pos' : 'neg', 'Einnahmen-Ausgaben-Rechnung (Zufluss)', 'wallet')}
+        ${smallBiz ? kpi('Umsatzsteuer', 'entfällt', '', 'Kleinunternehmerregelung § 6 Abs. 1 Z 27 UStG', 'shield') : kpi('USt-Zahllast', money(ust - vst), ust - vst > 0 ? 'neg' : 'pos', `USt ${money(ust)} − Vorsteuer ${money(vst)}`, 'file')}`}
       </div>
       ${clubReport}
       <section class="card"><div class="card-head"><h3>Monatsverlauf ${esc(year)}</h3><span class="muted">netto</span></div>${barChart(months)}</section>
@@ -2914,12 +2955,12 @@
         <section class="card"><div class="card-head"><h3>Ausgaben nach Kategorie</h3></div>${catTable(byCat(exp), expNet)}</section>
       </div>
       <div class="grid-2">
-        ${smallBiz ? '' : `<section class="card"><div class="card-head"><h3>Umsatzsteuer-Übersicht</h3><span class="muted">Hilfe für die UStVA – keine Steuerberatung</span></div>
+        ${smallBiz ? '' : `<section class="card"><div class="card-head"><h3>Umsatzsteuer-Übersicht</h3><span class="muted">Hilfe für die UVA (U30) – keine Steuerberatung</span></div>
           <table><tbody>
-            ${[19, 7, 0].map((r) => { const es = inc.filter((e) => num(e.rate) === r && e.rate != null); return `<tr><td>Umsätze ${r} %</td><td class="num">${money(sum(es, (e) => e.net))}</td><td class="num">${money(sum(es, (e) => e.tax))}</td></tr>`; }).join('')}
+            ${[[20, 'KZ 022'], [13, 'KZ 006'], [10, 'KZ 029'], [0, 'steuerfrei']].map(([r, kz]) => { const es = inc.filter((e) => num(e.rate) === r && e.rate != null); return `<tr><td>Umsätze ${r} % <span class="muted small">${kz}</span></td><td class="num">${money(sum(es, (e) => e.net))}</td><td class="num">${money(sum(es, (e) => e.tax))}</td></tr>`; }).join('')}
             ${inc.some((e) => e.rate == null) ? `<tr><td>Umsätze gemischt</td><td class="num">${money(sum(inc.filter((e) => e.rate == null), (e) => e.net))}</td><td class="num">${money(sum(inc.filter((e) => e.rate == null), (e) => e.tax))}</td></tr>` : ''}
-            <tr><td>Vorsteuer aus Ausgaben</td><td class="num">${money(expNet)}</td><td class="num">−${money(vst)}</td></tr>
-          </tbody><tfoot><tr><td>Zahllast / Erstattung</td><td></td><td class="num">${money(ust - vst)}</td></tr></tfoot></table>
+            <tr><td>Vorsteuer aus Ausgaben <span class="muted small">KZ 060</span></td><td class="num">${money(expNet)}</td><td class="num">−${money(vst)}</td></tr>
+          </tbody><tfoot><tr><td>Zahllast / Gutschrift <span class="muted small">KZ 095</span></td><td></td><td class="num">${money(ust - vst)}</td></tr></tfoot></table>
         </section>`}
         ${mod('invoices') || mod('purchases') ? `<section class="card"><div class="card-head"><h3>Offene Posten</h3><span class="muted">aktuell</span></div>
           <table><tbody>
@@ -2971,8 +3012,23 @@
       downloadCsv(`nexcount-beitraege-${stamp}.csv`, ['Mitglied', 'Nr.', 'Zeitraum', 'Fällig', 'Betrag', 'Status', 'Bezahlt am', 'Zahlungsart'],
         all('dues').sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate))).map((d) => [d.memberName, d.memberNo, d.periodLabel, fmtDate(d.dueDate), num(d.amount), { open: 'offen', paid: 'bezahlt', waived: 'erlassen' }[d.status], fmtDate(d.paidAt), d.method]));
     } else if (what === 'donations') {
-      downloadCsv(`nexcount-spenden-${stamp}.csv`, ['Datum', 'Spender', 'Straße', 'PLZ', 'Ort', 'Art', 'Betrag', 'Aufwandsspende', 'Bestätigung', 'Bestätigt am'],
-        all('donations').sort((a, b) => String(a.date).localeCompare(String(b.date))).map((d) => [fmtDate(d.date), d.donorName, d.donorStreet, d.donorZip, d.donorCity, DON_KINDS[d.kind], num(d.amount), d.waiver ? 'ja' : 'nein', d.receiptNo, fmtDate(d.receiptDate)]));
+      downloadCsv(`nexcount-spenden-${stamp}.csv`, ['Datum', 'Vorname', 'Zuname / Firma', 'Geburtsdatum', 'Straße', 'PLZ', 'Ort', 'Art', 'Betrag', 'Übermittlung untersagt', 'Bestätigung', 'Bestätigt am'],
+        all('donations').sort((a, b) => String(a.date).localeCompare(String(b.date))).map((d) => [fmtDate(d.date), d.donorFirst, d.donorLast || d.donorName, fmtDate(d.donorBirth), d.donorStreet, d.donorZip, d.donorCity, DON_KINDS[d.kind], num(d.amount), d.noTransfer ? 'ja' : 'nein', d.receiptNo, fmtDate(d.receiptDate)]));
+    } else if (what === 'donation-report') {
+      // Jahresliste für die Spendenmeldung (§ 18 Abs. 8 EStG): Summe je Person mit Vor-/Zuname und Geburtsdatum
+      const year = UI.q.donYear || today().slice(0, 4);
+      const groups = new Map();
+      for (const d of all('donations').filter((x) => String(x.date).startsWith(year) && canReport(x))) {
+        const key = `${d.donorFirst.trim().toLowerCase()}|${d.donorLast.trim().toLowerCase()}|${d.donorBirth}`;
+        const g = groups.get(key) || { first: d.donorFirst.trim(), last: d.donorLast.trim(), birth: d.donorBirth, sum: 0, n: 0 };
+        g.sum = r2(g.sum + num(d.amount)); g.n += 1;
+        groups.set(key, g);
+      }
+      const rows = [...groups.values()].sort((a, b) => a.last.localeCompare(b.last, 'de') || a.first.localeCompare(b.first, 'de'));
+      if (!rows.length) { toast(`Keine meldefähigen Spenden für ${year} (Vor-/Zuname und Geburtsdatum nötig).`, 'warn'); return; }
+      downloadCsv(`nexcount-spendenmeldung-${year}.csv`, ['Jahr', 'Vorname', 'Zuname', 'Geburtsdatum', 'Anzahl Spenden', 'Jahressumme'],
+        rows.map((g) => [year, g.first, g.last, fmtDate(g.birth), g.n, g.sum]));
+      return;
     } else if (what === 'times') {
       downloadCsv(`nexcount-zeiten-${stamp}.csv`, ['Datum', 'Kunde', 'Projekt', 'Tätigkeit', 'Stunden', 'Stundensatz', 'Betrag', 'Abrechenbar', 'Rechnung'],
         all('times').sort((a, b) => String(a.date).localeCompare(String(b.date))).map((t) => [fmtDate(t.date), t.contactName, t.project, t.description, r2(num(t.minutes) / 60), num(t.rate), timeValue(t), t.billable === false ? 'nein' : 'ja', isBilled(t) ? (get('documents', t.billedDocId).number || 'Entwurf') : '']));
@@ -2983,7 +3039,7 @@
       downloadCsv(`nexcount-belege-${stamp}.csv`, ['Nummer', 'Typ', 'Datum', 'Fällig', 'Kontakt', 'Status', 'Netto', 'USt', 'Brutto', 'Bezahlt am'],
         all('documents').sort((a, b) => String(a.date).localeCompare(String(b.date))).map((d) => { const t = calcTotals(d.items); return [d.number || 'Entwurf', d.kind === 'sale' ? 'Rechnung' : 'Einkauf', fmtDate(d.date), fmtDate(d.dueDate), d.contact && d.contact.name, DOC_STATUS[d.status], t.net, t.tax, t.gross, fmtDate(d.paidAt)]; }));
     } else if (what === 'contacts') {
-      downloadCsv(`nexcount-kontakte-${stamp}.csv`, ['Nr.', 'Typ', 'Name', 'Ansprechpartner', 'E-Mail', 'Telefon', 'Straße', 'PLZ', 'Ort', 'Land', 'USt-IdNr.', 'IBAN'],
+      downloadCsv(`nexcount-kontakte-${stamp}.csv`, ['Nr.', 'Typ', 'Name', 'Ansprechpartner', 'E-Mail', 'Telefon', 'Straße', 'PLZ', 'Ort', 'Land', 'UID-Nr.', 'IBAN'],
         all('contacts').sort(byName).map((c) => [c.number, CONTACT_TYPES[c.type], c.name, c.contactPerson, c.email, c.phone, c.street, c.zip, c.city, c.country, c.vatId, c.iban]));
     } else if (what === 'backup') {
       const out = { app: 'NEXCOUNT', version: 1, exportedAt: new Date().toISOString(), company: companyName(), data: {} };
@@ -3030,30 +3086,31 @@
             ${field('Telefon', inp('phone', s.phone, 'maxlength="40"'))}
             ${field('E-Mail', inp('email', s.email, 'type="email" maxlength="120"'))}
             ${field('Website', inp('website', s.website, 'maxlength="120"'), 'span2')}
-            ${club ? field('Registergericht & Nr.', inp('register', s.register, 'maxlength="80" placeholder="z. B. AG Musterstadt VR 1234"'), 'span2') : ''}
+            ${club ? field('ZVR-Zahl', inp('register', s.register, 'maxlength="20" inputmode="numeric" placeholder="z. B. 123456789"'), 'span2')
+              : field('Firmenbuchnummer & Gericht', inp('fbNumber', s.fbNumber, 'maxlength="60" placeholder="z. B. FN 123456a, LG Graz (falls eingetragen)"'), 'span2')}
           </div>
         </section>
         <section class="card">
           <div class="card-head"><h3>Steuern & Bank</h3></div>
           <div class="grid2">
-            ${field('Steuernummer', inp('taxNumber', s.taxNumber, 'maxlength="30"'))}
-            ${club ? field('Finanzamt', inp('taxOffice', s.taxOffice, 'maxlength="80"')) : field('USt-IdNr.', inp('vatId', s.vatId, 'maxlength="30"'))}
+            ${field('Steuernummer', inp('taxNumber', s.taxNumber, 'maxlength="30" placeholder="z. B. 12 345/6789"'))}
+            ${field(club ? 'UID-Nr. (falls vorhanden)' : 'UID-Nr.', inp('vatId', s.vatId, 'maxlength="30" placeholder="ATU…"'))}
             ${field('Bank', inp('bank', s.bank, 'maxlength="80"'), 'span2')}
             ${field('IBAN', inp('iban', s.iban, 'maxlength="40"'))}
             ${field('BIC', inp('bic', s.bic, 'maxlength="20"'))}
             ${!club ? field('Standard-Stundensatz netto (€)', numInp('hourlyRate', s.hourlyRate ?? '', 'min="0"')) : ''}
           </div>
-          <label class="check" style="margin-top:14px"><input type="checkbox" name="smallBusiness" ${s.smallBusiness ? 'checked' : ''}> Kleinunternehmer nach § 19 UStG (keine Umsatzsteuer ausweisen)</label>
-          ${club ? `<label class="check" style="margin-top:10px"><input type="checkbox" name="nonProfit" ${s.nonProfit !== false ? 'checked' : ''}> Gemeinnützig anerkannt</label>` : ''}
+          <label class="check" style="margin-top:14px"><input type="checkbox" name="smallBusiness" ${s.smallBusiness ? 'checked' : ''}> Kleinunternehmer gemäß § 6 Abs. 1 Z 27 UStG (keine Umsatzsteuer ausweisen)</label>
+          ${club ? `<label class="check" style="margin-top:10px"><input type="checkbox" name="nonProfit" ${s.nonProfit !== false ? 'checked' : ''}> Gemeinnützig (§§ 34 ff. BAO)</label>` : ''}
         </section>
       </div>
       ${club ? `<section class="card">
-        <div class="card-head"><h3>Freistellungsbescheid</h3><span class="muted">für Zuwendungsbestätigungen</span></div>
+        <div class="card-head"><h3>Gemeinnützigkeit & Spenden</h3><span class="muted">für Spendenbestätigungen und die Spendenmeldung</span></div>
         <div class="grid3">
-          ${field('Freistellungsbescheid vom', inp('exemptionDate', s.exemptionDate, 'type="date"'))}
-          ${field('Steuerbegünstigte Zwecke', inp('purposes', s.purposes, 'maxlength="200" placeholder="z. B. des Sports und der Jugendhilfe"'), 'span2')}
+          ${field('Begünstigte Zwecke laut Statuten', inp('purposes', s.purposes, 'maxlength="200" placeholder="z. B. Förderung des Amateursports"'), 'span2')}
+          ${field('Spendenbegünstigung – Reg.-Nr.', inp('donationRegNo', s.donationRegNo, 'maxlength="30" placeholder="z. B. SO 1234"'))}
         </div>
-        <p class="muted small" style="margin-top:10px">Der Bescheid darf bei Ausstellung höchstens 5 Jahre alt sein. Die Vorlage folgt dem amtlichen Muster – bitte vor der ersten Verwendung mit dem aktuellen Muster des Bundesfinanzministeriums abgleichen.</p>
+        <p class="muted small" style="margin-top:10px">Spenden sind nur absetzbar, wenn der Verein auf der Liste der begünstigten Spendenempfänger des BMF steht. Begünstigte Organisationen müssen erhaltene Spenden jährlich bis Ende Februar an das Finanzamt melden (Sonderausgaben-Datenübermittlung) – die Jahresliste dafür findest du unter Spenden. Keine Steuerberatung.</p>
       </section>` : ''}
       <div><button class="btn primary" type="submit">${icon('check', 16)} Speichern</button></div>
     </form>`;
@@ -3192,7 +3249,7 @@
     const s = settings();
     put('settings', {
       ...s, id: 'company', setupDone: true, modules: currentModules(),
-      ...(s.street ? {} : { street: 'Sportplatzweg 3', zip: '79098', city: 'Freiburg', taxOffice: 'Finanzamt Freiburg-Stadt', taxNumber: '06469/12345', exemptionDate: addDays(today(), -400), purposes: 'des Sports', register: 'AG Freiburg VR 4711', nonProfit: true, smallBusiness: true }),
+      ...(s.street ? {} : { street: 'Sportplatzweg 3', zip: '8010', city: 'Graz', taxNumber: '68 123/4567', purposes: 'Förderung des Amateursports', register: '123456789', donationRegNo: 'SO 1234', nonProfit: true, smallBusiness: true }),
     });
     const people = [
       ['Bauer, Lena', 'active', 'Erwachsene', 60, 'year', -900], ['Schmidt, Tom', 'active', 'Erwachsene', 60, 'year', -700], ['Yilmaz, Elif', 'active', 'Jugendliche', 30, 'year', -300],
@@ -3201,34 +3258,34 @@
     ];
     const ms = people.map(([name, status, feeGroup, fee, feeInterval, joined], i) => put('contacts', {
       type: 'member', number: `M-${String(i + 1).padStart(4, '0')}`, name, status, feeGroup, fee, feeInterval, joinedAt: addDays(today(), joined),
-      leftAt: status === 'left' ? addDays(today(), -60) : '', email: `${name.split(',')[0].toLowerCase().replace(/[^a-z]/g, '')}@beispiel.de`, street: 'Musterstraße 1', zip: '79098', city: 'Freiburg',
+      leftAt: status === 'left' ? addDays(today(), -60) : '', email: `${name.split(',')[0].toLowerCase().replace(/[^a-z]/g, '')}@beispiel.at`, street: 'Musterstraße 1', zip: '8010', city: 'Graz',
     }));
     const year = today().slice(0, 4);
     for (const d of duesPreview(year, 15)) {
       const due = put('dues', d);
-      if (d.dueDate < addDays(today(), -30) && Math.random() > 0.25) markDuePaid(due, addDays(d.dueDate, 3), 'Lastschrift');
+      if (d.dueDate < addDays(today(), -30) && Math.random() > 0.25) markDuePaid(due, addDays(d.dueDate, 3), 'Bankeinzug');
     }
-    const sponsor = mod('contacts') ? put('contacts', { type: 'customer', number: 'K-0001', name: 'Autohaus Sonnenberg GmbH', street: 'Industriestraße 8', zip: '79110', city: 'Freiburg', country: 'Deutschland' }) : null;
+    const sponsor = mod('contacts') ? put('contacts', { type: 'customer', number: 'K-0001', name: 'Autohaus Sonnenberg GmbH', street: 'Industriestraße 8', zip: '8020', city: 'Graz', country: 'Österreich' }) : null;
     const don = (daysAgo, name, amount, extra = {}) => {
-      const d = put('donations', { date: addDays(today(), -daysAgo), donorName: name, donorStreet: 'Musterstraße 1', donorZip: '79098', donorCity: 'Freiburg', kind: 'money', amount, method: 'Bank', ...extra });
+      const d = put('donations', { date: addDays(today(), -daysAgo), donorName: name, donorLast: name, donorStreet: 'Musterstraße 1', donorZip: '8010', donorCity: 'Graz', kind: 'money', amount, method: 'Bank', ...extra });
       if (d.kind === 'money') {
         const e = put('entries', { date: d.date, kind: 'income', category: 'Spenden', sphere: 'ideell', description: `Spende · ${name}`, net: amount, tax: 0, gross: amount, rate: 0, method: 'Bank', donationId: d.id });
         put('donations', { ...d, entryId: e.id });
       }
     };
-    don(20, ms[0].name, 100, { donorId: ms[0].id });
-    don(45, sponsor ? sponsor.name : 'Autohaus Sonnenberg GmbH', 500, { donorId: sponsor ? sponsor.id : '', donorStreet: 'Industriestraße 8', donorZip: '79110' });
-    don(80, ms[3].name, 50, { donorId: ms[3].id, waiver: true });
-    don(10, 'Sporthaus Lange', 240, { kind: 'goods', goodsDesc: '12 Trainingsleibchen, neu', goodsBasis: 'Rechnung vom Händler' });
+    don(20, 'Lena Bauer', 100, { donorId: ms[0].id, donorFirst: 'Lena', donorLast: 'Bauer', donorBirth: '1988-04-12' });
+    don(45, sponsor ? sponsor.name : 'Autohaus Sonnenberg GmbH', 500, { donorId: sponsor ? sponsor.id : '', donorCompany: true, donorStreet: 'Industriestraße 8', donorZip: '8020' });
+    don(80, 'Jan Novak', 50, { donorId: ms[3].id, donorFirst: 'Jan', donorLast: 'Novak' });
+    don(10, 'Sporthaus Lange', 240, { kind: 'goods', goodsDesc: '12 Trainingsleibchen, neu' });
     const ent = (daysAgo, kind, category, description, gross, sphere, method = 'Bank') => put('entries', { date: addDays(today(), -daysAgo), kind, category, description, method, rate: 0, net: gross, tax: 0, gross, sphere });
     ent(5, 'expense', 'Hallen- & Platzmiete', 'Hallenmiete Oktober', 320, 'ideell');
     ent(35, 'expense', 'Hallen- & Platzmiete', 'Hallenmiete September', 320, 'ideell');
-    ent(12, 'expense', 'Übungsleiter', 'Übungsleiterpauschale Q3', 450, 'ideell');
-    ent(40, 'expense', 'Verbandsbeiträge', 'Landessportbund Jahresbeitrag', 180, 'ideell');
-    ent(25, 'income', 'Zuschüsse', 'Zuschuss Stadt Jugendarbeit', 800, 'ideell');
-    ent(60, 'income', 'Bewirtung & Verkauf', 'Sommerfest Getränkeverkauf', 1260, 'wirtschaft', 'Kasse');
-    ent(60, 'expense', 'Veranstaltungen', 'Sommerfest Einkauf Getränke', 540, 'wirtschaft', 'Kasse');
-    ent(90, 'income', 'Veranstaltungen', 'Startgelder Vereinsturnier', 380, 'zweck', 'Kasse');
+    ent(12, 'expense', 'Trainer & Übungsleiter', 'Pauschale Reiseaufwandsentschädigung Trainer Q3', 450, 'ideell');
+    ent(40, 'expense', 'Verbandsbeiträge', 'Landesverband Jahresbeitrag', 180, 'ideell');
+    ent(25, 'income', 'Subventionen', 'Subvention Stadt Graz Jugendarbeit', 800, 'ideell');
+    ent(60, 'income', 'Kantine & Buffet', 'Sommerfest Getränkeverkauf', 1260, 'entbehrlich', 'Kassa');
+    ent(60, 'expense', 'Veranstaltungen', 'Sommerfest Einkauf Getränke', 540, 'entbehrlich', 'Kassa');
+    ent(90, 'income', 'Veranstaltungen', 'Startgelder Vereinsturnier', 380, 'zweck', 'Kassa');
     ent(30, 'income', 'Zinserträge', 'Zinsen Tagesgeld', 12.4, 'vermoegen');
     if (mod('inventory')) {
       const item = (sku, name, unit, ek, min, location, initial) => {
@@ -3247,44 +3304,44 @@
     if (isClub()) return seedClubDemo();
     if (!confirm('Beispieldaten (Kunden, Produkte, Leistungen, Belege, Buchungen) anlegen? Sie werden mit deinem Team synchronisiert.')) return;
     const s = settings();
-    const demoFirm = s.street ? {} : { name: s.name || companyName(), street: 'Hauptstraße 12', zip: '10115', city: 'Berlin', email: 'info@example.com', taxNumber: '12/345/67890', iban: 'DE02 1203 0000 0000 2020 51', bic: 'BYLADEM1001', bank: 'Musterbank', paymentDays: 14 };
+    const demoFirm = s.street ? {} : { name: s.name || companyName(), street: 'Mariahilfer Straße 12', zip: '1070', city: 'Wien', email: 'info@example.com', taxNumber: '07 123/4567', iban: 'AT61 1904 3002 3457 3201', bic: 'BKAUATWW', bank: 'Musterbank', paymentDays: 14 };
     put('settings', { ...s, ...demoFirm, id: 'company', setupDone: true, modules: currentModules() });
-    const k1 = put('contacts', { type: 'customer', number: 'K-0001', name: 'Müller Gastro GmbH', contactPerson: 'Anna Müller', email: 'einkauf@mueller-gastro.example', phone: '030 1234567', street: 'Lindenallee 4', zip: '10117', city: 'Berlin', country: 'Deutschland' });
-    const k2 = put('contacts', { type: 'customer', number: 'K-0002', name: 'Café Sonnenschein', contactPerson: 'Jonas Weber', email: 'hallo@cafe-sonnenschein.example', street: 'Marktplatz 1', zip: '14467', city: 'Potsdam', country: 'Deutschland' });
-    const l1 = put('contacts', { type: 'supplier', number: 'L-0001', name: 'Rösterei Nordlicht KG', email: 'vertrieb@nordlicht.example', street: 'Hafenstraße 22', zip: '20457', city: 'Hamburg', country: 'Deutschland' });
+    const k1 = put('contacts', { type: 'customer', number: 'K-0001', name: 'Müller Gastro GmbH', contactPerson: 'Anna Müller', email: 'einkauf@mueller-gastro.example', phone: '01 2345678', street: 'Lindengasse 4', zip: '1070', city: 'Wien', country: 'Österreich' });
+    const k2 = put('contacts', { type: 'customer', number: 'K-0002', name: 'Café Sonnenschein', contactPerson: 'Jonas Weber', email: 'hallo@cafe-sonnenschein.example', street: 'Hauptplatz 1', zip: '8010', city: 'Graz', country: 'Österreich' });
+    const l1 = put('contacts', { type: 'supplier', number: 'L-0001', name: 'Rösterei Nordlicht KG', email: 'vertrieb@nordlicht.example', street: 'Hafenstraße 22', zip: '4020', city: 'Linz', country: 'Österreich' });
     const mk = (sku, name, category, unit, ek, vk, tax, min, location, initial) => {
       const a = put('articles', { type: 'product', sku, name, category, unit, ek, vk, tax, min, location });
       put('movements', { articleId: a.id, qty: initial, type: 'initial', date: addDays(today(), -60), unitCost: ek, note: 'Anfangsbestand' });
       return a;
     };
-    const a1 = mk('A-0001', 'Espressobohnen Classico 1 kg', 'Kaffee', 'Stk', 11.9, 19.9, 7, 20, 'Regal A1', 64);
-    const a2 = mk('A-0002', 'Hafermilch Barista 1 l', 'Milchalternativen', 'Stk', 1.45, 2.6, 7, 48, 'Kühlraum', 40);
-    const a3 = mk('A-0003', 'Coffee-to-go Becher 300 ml (50 Stk)', 'Verpackung', 'Pkt', 4.2, 8.5, 19, 15, 'Regal B2', 22);
-    mk('A-0004', 'Siebträger-Reinigungstabletten', 'Zubehör', 'Pkt', 6.8, 12.9, 19, 5, 'Regal C1', 12);
-    mk('A-0005', 'Milchkännchen Edelstahl 600 ml', 'Zubehör', 'Stk', 9.5, 19.0, 19, 3, 'Regal C2', 7);
-    const sv1 = put('articles', { type: 'service', sku: 'L-0001', name: 'Barista-Schulung', category: 'Schulung', unit: 'Std', ek: 0, vk: 65, tax: 19 });
-    const sv2 = put('articles', { type: 'service', sku: 'L-0002', name: 'Wartung Siebträgermaschine', category: 'Service', unit: 'Std', ek: 0, vk: 79, tax: 19 });
-    const inv1 = { id: uid(), kind: 'sale', status: 'draft', date: addDays(today(), -24), dueDate: addDays(today(), -10), contactId: k1.id, contact: { name: k1.name, contactPerson: k1.contactPerson, street: k1.street, zip: k1.zip, city: k1.city, country: k1.country, number: k1.number }, items: [{ articleId: a1.id, text: a1.name, qty: 12, price: 19.9, tax: 7, unit: 'Stk' }, { articleId: a3.id, text: a3.name, qty: 4, price: 8.5, tax: 19, unit: 'Pkt' }], notes: '' };
+    const a1 = mk('A-0001', 'Espressobohnen Classico 1 kg', 'Kaffee', 'Stk', 11.9, 19.9, 10, 20, 'Regal A1', 64);
+    const a2 = mk('A-0002', 'Bio-Vollmilch 1 l', 'Milch', 'Stk', 1.45, 2.6, 10, 48, 'Kühlraum', 40);
+    const a3 = mk('A-0003', 'Coffee-to-go Becher 300 ml (50 Stk)', 'Verpackung', 'Pkt', 4.2, 8.5, 20, 15, 'Regal B2', 22);
+    mk('A-0004', 'Siebträger-Reinigungstabletten', 'Zubehör', 'Pkt', 6.8, 12.9, 20, 5, 'Regal C1', 12);
+    mk('A-0005', 'Milchkännchen Edelstahl 600 ml', 'Zubehör', 'Stk', 9.5, 19.0, 20, 3, 'Regal C2', 7);
+    const sv1 = put('articles', { type: 'service', sku: 'L-0001', name: 'Barista-Schulung', category: 'Schulung', unit: 'Std', ek: 0, vk: 65, tax: 20 });
+    const sv2 = put('articles', { type: 'service', sku: 'L-0002', name: 'Wartung Siebträgermaschine', category: 'Service', unit: 'Std', ek: 0, vk: 79, tax: 20 });
+    const inv1 = { id: uid(), kind: 'sale', status: 'draft', date: addDays(today(), -24), dueDate: addDays(today(), -10), contactId: k1.id, contact: { name: k1.name, contactPerson: k1.contactPerson, street: k1.street, zip: k1.zip, city: k1.city, country: k1.country, number: k1.number }, items: [{ articleId: a1.id, text: a1.name, qty: 12, price: 19.9, tax: 10, unit: 'Stk' }, { articleId: a3.id, text: a3.name, qty: 4, price: 8.5, tax: 20, unit: 'Pkt' }], notes: '' };
     const d1 = finalizeDoc(inv1);
     markDocPaid(d1, addDays(today(), -12), 'Bank');
-    const inv2 = { id: uid(), kind: 'sale', status: 'draft', date: addDays(today(), -5), dueDate: addDays(today(), 9), contactId: k2.id, contact: { name: k2.name, contactPerson: k2.contactPerson, street: k2.street, zip: k2.zip, city: k2.city, country: k2.country, number: k2.number }, items: [{ articleId: a2.id, text: a2.name, qty: 24, price: 2.6, tax: 7, unit: 'Stk' }, { articleId: sv1.id, text: sv1.name, qty: 2, price: 65, tax: 19, unit: 'Std' }], notes: '' };
+    const inv2 = { id: uid(), kind: 'sale', status: 'draft', date: addDays(today(), -5), dueDate: addDays(today(), 9), contactId: k2.id, contact: { name: k2.name, contactPerson: k2.contactPerson, street: k2.street, zip: k2.zip, city: k2.city, country: k2.country, number: k2.number }, items: [{ articleId: a2.id, text: a2.name, qty: 24, price: 2.6, tax: 10, unit: 'Stk' }, { articleId: sv1.id, text: sv1.name, qty: 2, price: 65, tax: 20, unit: 'Std' }], notes: '' };
     finalizeDoc(inv2);
-    finalizeDoc({ id: uid(), kind: 'quote', status: 'draft', date: addDays(today(), -3), dueDate: addDays(today(), 27), contactId: k1.id, contact: inv1.contact, reference: 'Jahreswartung 2027', items: [{ articleId: sv2.id, text: `${sv2.name} (4 Termine)`, qty: 8, price: 79, tax: 19, unit: 'Std' }, { articleId: a1.id, text: a1.name, qty: 24, price: 18.9, tax: 7, unit: 'Stk' }], notes: '' });
-    const p1 = { id: uid(), kind: 'purchase', status: 'draft', date: addDays(today(), -30), dueDate: '', contactId: l1.id, contact: { name: l1.name, street: l1.street, zip: l1.zip, city: l1.city }, reference: 'NL-88412', items: [{ articleId: a1.id, text: a1.name, qty: 30, price: 11.9, tax: 7, unit: 'Stk' }], notes: '' };
+    finalizeDoc({ id: uid(), kind: 'quote', status: 'draft', date: addDays(today(), -3), dueDate: addDays(today(), 27), contactId: k1.id, contact: inv1.contact, reference: 'Jahreswartung 2027', items: [{ articleId: sv2.id, text: `${sv2.name} (4 Termine)`, qty: 8, price: 79, tax: 20, unit: 'Std' }, { articleId: a1.id, text: a1.name, qty: 24, price: 18.9, tax: 10, unit: 'Stk' }], notes: '' });
+    const p1 = { id: uid(), kind: 'purchase', status: 'draft', date: addDays(today(), -30), dueDate: '', contactId: l1.id, contact: { name: l1.name, street: l1.street, zip: l1.zip, city: l1.city }, reference: 'NL-88412', items: [{ articleId: a1.id, text: a1.name, qty: 30, price: 11.9, tax: 10, unit: 'Stk' }], notes: '' };
     markDocPaid(finalizeDoc(p1), addDays(today(), -28), 'Bank');
     const ent = (daysAgo, kind, category, description, gross, rate, method) => put('entries', { date: addDays(today(), -daysAgo), kind, category, description, method, rate, ...splitGross(gross, rate) });
-    ent(2, 'expense', 'Miete', 'Lagermiete', 650, 19, 'Bank');
-    ent(32, 'expense', 'Miete', 'Lagermiete', 650, 19, 'Bank');
-    ent(62, 'expense', 'Miete', 'Lagermiete', 650, 19, 'Bank');
-    ent(92, 'expense', 'Miete', 'Lagermiete', 650, 19, 'Bank');
-    ent(8, 'expense', 'Software', 'Kassensystem Lizenz', 39, 19, 'Karte');
-    ent(15, 'income', 'Warenverkauf', 'Barverkauf Ladengeschäft', 486.4, 7, 'Kasse');
-    ent(45, 'income', 'Warenverkauf', 'Barverkauf Ladengeschäft', 1240.5, 7, 'Kasse');
-    ent(75, 'income', 'Warenverkauf', 'Barverkauf Ladengeschäft', 980, 7, 'Kasse');
-    ent(105, 'income', 'Dienstleistung', 'Maschinenwartung Café Rosa', 357, 19, 'Bank');
-    ent(50, 'expense', 'Marketing', 'Flyer & Plakate', 214.2, 19, 'Bank');
-    ent(130, 'income', 'Warenverkauf', 'Wochenmarkt-Verkauf', 720, 7, 'Kasse');
-    ent(140, 'expense', 'Fahrzeug', 'Tanken Lieferwagen', 96.5, 19, 'Karte');
+    ent(2, 'expense', 'Miete & Betriebskosten', 'Lagermiete', 650, 20, 'Bank');
+    ent(32, 'expense', 'Miete & Betriebskosten', 'Lagermiete', 650, 20, 'Bank');
+    ent(62, 'expense', 'Miete & Betriebskosten', 'Lagermiete', 650, 20, 'Bank');
+    ent(92, 'expense', 'Miete & Betriebskosten', 'Lagermiete', 650, 20, 'Bank');
+    ent(8, 'expense', 'Software', 'Registrierkasse Lizenz', 39, 20, 'Kreditkarte');
+    ent(15, 'income', 'Warenerlöse', 'Barverkauf Ladengeschäft', 486.4, 10, 'Kassa');
+    ent(45, 'income', 'Warenerlöse', 'Barverkauf Ladengeschäft', 1240.5, 10, 'Kassa');
+    ent(75, 'income', 'Warenerlöse', 'Barverkauf Ladengeschäft', 980, 10, 'Kassa');
+    ent(105, 'income', 'Dienstleistungserlöse', 'Maschinenwartung Café Rosa', 357, 20, 'Bank');
+    ent(50, 'expense', 'Werbung', 'Flyer & Plakate', 214.2, 20, 'Bank');
+    ent(130, 'income', 'Warenerlöse', 'Wochenmarkt-Verkauf', 720, 10, 'Kassa');
+    ent(140, 'expense', 'Kfz', 'Tanken Lieferwagen', 96.5, 20, 'Kreditkarte');
     if (mod('time')) {
       const tm = (daysAgo, c, project, description, minutes) => put('times', { date: addDays(today(), -daysAgo), contactId: c.id, contactName: c.name, project, description, minutes, rate: num(s.hourlyRate) || 75, billable: true });
       tm(1, k1, 'Kaffeebar-Umbau', 'Aufmaß und Planung vor Ort', 150);
@@ -3448,7 +3505,7 @@
     'setup-finish': () => {
       const st = setupState();
       const s = settings();
-      const keys = ['orgType', 'legalForm', 'smallBusiness', 'nonProfit', 'street', 'zip', 'city', 'taxNumber', 'vatId', 'taxOffice', 'exemptionDate', 'purposes', 'register', 'inventoryLink'];
+      const keys = ['orgType', 'legalForm', 'smallBusiness', 'nonProfit', 'street', 'zip', 'city', 'taxNumber', 'vatId', 'purposes', 'register', 'fbNumber', 'donationRegNo', 'inventoryLink'];
       const data = { ...s, id: 'company', name: s.name || companyName(), modules: st.modules, setupDone: true };
       for (const k of keys) data[k] = typeof st[k] === 'string' ? st[k].trim() : st[k];
       if (st.hourlyRate !== '' && st.hourlyRate != null) data.hourlyRate = num(st.hourlyRate);
@@ -3488,7 +3545,7 @@
     },
     'due-reopen': (el) => {
       const d = get('dues', el.dataset.id);
-      if (!d || !confirm(`Beitrag wieder auf „offen“ setzen?${d.entryId ? ' Die Buchung im Kassenbuch wird entfernt.' : ''}`)) return;
+      if (!d || !confirm(`Beitrag wieder auf „offen“ setzen?${d.entryId ? ' Die Buchung im Kassabuch wird entfernt.' : ''}`)) return;
       if (d.entryId && get('entries', d.entryId)) del('entries', d.entryId);
       put('dues', { ...d, status: 'open', paidAt: null, entryId: null });
       render();

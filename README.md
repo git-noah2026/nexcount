@@ -1,7 +1,8 @@
 # NEXCOUNT by Andrerer – Das Buchhaltungs- und Lagersystem für die Kleinen
 
 Web-App für Selbstständige, Dienstleister, Kleinunternehmen und Vereine: Rechnungen, Angebote,
-Zeiterfassung, Mitglieder, Beiträge, Spenden, Kassenbuch – und als eigenes System **NEXCOUNT Lager**.
+Zeiterfassung, Mitglieder, Beiträge, Spenden, Kassabuch – und als eigenes System **NEXCOUNT Lager**.
+Ausgelegt auf **Österreich** (UStG 1994, BAO, EStG) – siehe unten.
 Mit Benutzeranmeldung, Teams und Echtzeit-Synchronisierung zwischen allen Geräten.
 
 ## Für jede Organisation das Richtige
@@ -14,12 +15,26 @@ und Zugang; danach führt ein Einrichtungsassistent durch Angaben und Funktionen
 | Einzelunternehmer & Freiberufler  | Rechnungen, Angebote, Zeiterfassung, Kunden, Preisliste, Berichte           |
 | Dienstleistungsunternehmen        | wie oben + Einkäufe                                                         |
 | Kleinunternehmen & Handel         | Rechnungen, Angebote, Einkäufe, Kunden & Lieferanten, Preisliste, Berichte  |
-| Verein                            | Mitglieder, Beitragsläufe, Spenden mit Zuwendungsbestätigung, Kassenbericht |
+| Verein                            | Mitglieder, Beitragsläufe, Spenden mit Spendenmeldung, Kassabericht         |
 
-Je nach Art passen sich Begriffe, Kategorien, Übersicht und Berichte an (Verein: Kassenstand,
-Buchungen nach Sphären – ideell, Vermögensverwaltung, Zweckbetrieb, wirtschaftlicher Geschäftsbetrieb).
+Je nach Art passen sich Begriffe, Kategorien, Übersicht und Berichte an (Verein: Kassastand,
+Buchungen nach Bereichen laut BAO – ideell, unentbehrlicher/entbehrlicher Hilfsbetrieb,
+begünstigungsschädlicher Betrieb, Vermögensverwaltung).
 Alle Funktionen lassen sich unter **Einstellungen → Funktionen** jederzeit an- und ausschalten;
 ausgeschaltete Bereiche werden nur ausgeblendet, ihre Daten bleiben erhalten.
+
+## Österreich
+
+- **Rechtsformen:** e.U., GmbH, FlexCo, OG, KG, GesbR, Einzelunternehmen, Neue Selbständige; Verein mit ZVR-Zahl.
+- **Umsatzsteuer:** Sätze 20 / 13 / 10 / 0 %; Kleinunternehmerregelung nach § 6 Abs. 1 Z 27 UStG
+  (Hinweis auf der Rechnung); Rechnungen mit UID-Nr., Leistungsdatum und Firmenbuchnummer.
+- **Berichte:** Einnahmen-Ausgaben-Rechnung und USt-Übersicht mit den UVA-Kennzahlen (KZ 022, 006, 029, 060, 095).
+- **Kassabuch:** Hinweis auf die Registrierkassenpflicht (§ 131b BAO) – NEXCOUNT ist keine RKSV-Registrierkasse.
+- **Vereine:** Gemeinnützigkeit nach §§ 34 ff. BAO, Bereiche inkl. § 45a-Hinweis (40.000 €),
+  Spendenbestätigung mit Registrierungsnummer (BMF-Liste) und Jahresliste für die Spendenmeldung
+  (Vor-/Zuname + Geburtsdatum, § 18 Abs. 8 EStG; Übermittlung bis Ende Februar über FinanzOnline).
+
+Die Angaben entsprechen dem Stand 2025 und ersetzen keine Steuerberatung.
 
 ## NEXCOUNT Lager – eigenes System, optional verknüpft
 
@@ -115,5 +130,5 @@ Redirect URLs* eintragen. Supabase-Bibliothek aktualisieren: `npm update @supaba
   unter *Authentication → Emails → SMTP Settings* einen eigenen Mail-Server eintragen.
 - Kostenlose Supabase-Projekte pausieren nach einer Woche ohne Aktivität (im Dashboard wieder
   aktivierbar).
-- Die Berichte sind eine Hilfe für die eigene Übersicht und ersetzen keine Steuerberatung oder
-  GoBD-zertifizierte Buchhaltungssoftware.
+- Die Berichte sind eine Hilfe für die eigene Übersicht und ersetzen weder Steuerberatung noch
+  eine Registrierkasse nach RKSV.
