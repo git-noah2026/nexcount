@@ -1,6 +1,6 @@
 /* NEXCOUNT Service Worker – App-Shell offline verfügbar machen (Network-first).
    Pfade sind relativ, damit die App auch unter einem Unterpfad läuft (z. B. GitHub Pages /nexcount/). */
-const CACHE = 'nexcount-v8';
+const CACHE = 'nexcount-v9';
 const ASSETS = ['./', './index.html', './app.css', './app.js', './config.js', './vendor/supabase.js', './icon.svg', './logo.svg', './logo-dark.svg', './manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
