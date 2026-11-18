@@ -547,8 +547,6 @@ td.actions { white-space: nowrap; text-align: right; width: 1%; }
    ===================================================================== */
 
 /* Lager-Bereich bekommt eine eigene Akzentfarbe */
-body[data-space="stock"] { --primary: #0d9488; --primary-hover: #0f766e; --primary-soft: #e3f6f3; --primary-ring: rgba(13, 148, 136, .22); --hero-from: #0f766e; --hero-to: #0891b2; }
-:root[data-theme="dark"] body[data-space="stock"] { --primary: #2dd4bf; --primary-hover: #5eead4; --primary-soft: #11332f; --primary-ring: rgba(45, 212, 191, .28); --hero-from: #115e59; --hero-to: #155e75; }
 
 .space-switch { display: flex; gap: 4px; padding: 4px; margin: 0 4px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
 .space-switch button { position: relative; flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 6px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font: inherit; font-weight: 650; font-size: 13px; cursor: pointer; }
@@ -599,8 +597,8 @@ body[data-space="stock"] { --primary: #0d9488; --primary-hover: #0f766e; --prima
 /* Funktionen: Trenner, Systemkarte Lager */
 .list-divider { margin: 10px 2px 2px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .system-card { display: grid; gap: 6px; padding: 6px; border-radius: 14px; border: 1.5px dashed var(--border-strong); background: var(--surface-2); }
-.system-card.on { border-style: solid; border-color: color-mix(in srgb, #0d9488 45%, var(--border)); background: color-mix(in srgb, #0d9488 6%, var(--surface)); }
-.system-card .module.system .module-ic { background: color-mix(in srgb, #0d9488 14%, var(--surface)); color: #0d9488; }
+.system-card.on { border-style: solid; border-color: color-mix(in srgb, #7c3aed 40%, var(--border)); background: color-mix(in srgb, #7c3aed 5%, var(--surface)); }
+.system-card .module.system .module-ic { background: color-mix(in srgb, #7c3aed 14%, var(--surface)); color: #7c3aed; }
 .module.sub { margin-left: 26px; padding: 10px 12px; }
 
 /* Hinweise & Teaser */
@@ -613,7 +611,7 @@ body[data-space="stock"] { --primary: #0d9488; --primary-hover: #0f766e; --prima
   display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: var(--radius);
   background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
 }
-.system-teaser > .ic { color: #0d9488; }
+.system-teaser > .ic { color: #7c3aed; }
 .system-teaser div, .link-card div, .timer-card div { flex: 1; min-width: 0; }
 .system-teaser b, .link-card b, .timer-card b { display: block; }
 .system-teaser span, .link-card span, .timer-card span { font-size: 13px; color: var(--text-2); }
@@ -695,3 +693,12 @@ section.subsection h4 { margin: 0 0 8px; font-size: 13px; color: var(--muted); t
   .danger-row { flex-direction: column; align-items: stretch; }
   .seg.chips { flex-wrap: nowrap; overflow-x: auto; }
 }
+
+/* ---------- NEXLOGISTIC-Verknüpfung */
+.system-card .module.system { cursor: default; }
+.system-card .module.system .badge { flex: none; align-self: center; }
+.nl-body { padding: 4px 12px 10px; }
+.nl-body ul { padding: 0; }
+.inline-form { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.inline-form input { height: 32px; padding: 4px 10px; }
+:root[data-theme="dark"] .system-card .module.system .module-ic { color: #a78bfa; }

@@ -1,4 +1,4 @@
-/* NEXCOUNT – Buchhaltungs- & Lagersystem by Andrerer */
+/* NEXCOUNT – Buchhaltung by Andrerer (Lager: NEXLOGISTIC, verknüpfbar) */
 'use strict';
 (() => {
   // =============================================================== Hilfsfunktionen
@@ -82,12 +82,11 @@
     members: { label: 'Mitgliederverwaltung', icon: 'heart', desc: 'Mitglieder mit Nummer, Status, Eintritt, Beitragsgruppe und Bankverbindung.' },
     dues: { label: 'Mitgliedsbeiträge', icon: 'repeat', desc: 'Beitragsläufe je Jahr, Halbjahr, Quartal oder Monat – Zahlungen landen im Kassabuch.', requires: ['members'] },
     donations: { label: 'Spenden', icon: 'gift', desc: 'Spenden erfassen, Spendenbestätigungen drucken und die Jahresliste für die Spendenmeldung erstellen.' },
-    inventory: { label: 'NEXCOUNT Lager', icon: 'layers', desc: 'Eigenständiges Lagersystem mit eigenem Bereich – auf Wunsch mit der Buchhaltung verknüpft.' },
     reports: { label: 'Berichte & Export', icon: 'chart', desc: 'Gewinnermittlung, Umsatzsteuer bzw. Kassabericht, CSV- und Backup-Export.' },
   };
   const ALL_MODULES = Object.keys(MODULES);
   // bisheriger Stand für Firmen ohne gespeicherte Auswahl
-  const LEGACY_MODULES = ['invoices', 'quotes', 'purchases', 'contacts', 'catalog', 'inventory', 'reports'];
+  const LEGACY_MODULES = ['invoices', 'quotes', 'purchases', 'contacts', 'catalog', 'reports'];
 
   // Organisationsarten – bestimmen Vorschläge für Funktionen, Begriffe, Kategorien und Ansichten
   const ORG_TYPES = {
@@ -100,7 +99,7 @@
       modules: ['invoices', 'quotes', 'purchases', 'contacts', 'catalog', 'time', 'reports'],
       legal: ['GmbH', 'FlexCo', 'e.U.', 'OG', 'KG', 'GesbR', 'Einzelunternehmen'] },
     small: { label: 'Kleinunternehmen & Handel', short: 'Kleinunternehmen', icon: 'cart',
-      desc: 'Laden, Werkstatt oder Handel: Verkauf und Einkauf – das Lager kannst du dazuschalten.',
+      desc: 'Laden, Werkstatt oder Handel: Verkauf und Einkauf – ein Lager verknüpfst du bei Bedarf mit NEXLOGISTIC.',
       modules: ['invoices', 'quotes', 'purchases', 'contacts', 'catalog', 'reports'],
       legal: ['Einzelunternehmen', 'e.U.', 'GmbH', 'FlexCo', 'OG', 'KG', 'GesbR'] },
     club: { label: 'Verein', short: 'Verein', icon: 'heart',
@@ -333,9 +332,7 @@
   // ohne gespeicherte Auswahl: Vorschlag der Organisationsart bzw. bisheriger Umfang
   const defaultModules = () => modsFromList(orgType() ? ORG_TYPES[orgType()].modules : LEGACY_MODULES);
   const currentModules = () => modulesOn() || defaultModules();
-  const mod = (name) => !!currentModules()[name];
-  // Lager-Verknüpfung: Belege buchen Bestände, Lagerartikel erscheinen in der Preisliste
-  const stockLinked = () => mod('inventory') && settings().inventoryLink !== false;
+  const mod = (name) => !!MODULES[name] && !!currentModules()[name];
   const catsFor = (kind) => {
     const t = orgType();
     const set = t === 'club' ? CATS.club : t === 'service' || t === 'sole' ? CATS.service : CATS.business;
@@ -364,13 +361,6 @@
   const companyName = () => settings().name || (S.company && S.company.name) || '';
   const articles = () => memo('arts', () => all('articles').filter((a) => !a.archived).sort(byName));
   const articleRaw = (id) => (col('articles')[id] && col('articles')[id].data) || null;
-  const stockMap = () => memo('stock', () => {
-    const m = {};
-    for (const mv of all('movements')) m[mv.articleId] = (m[mv.articleId] || 0) + num(mv.qty);
-    for (const k of Object.keys(m)) m[k] = r3(m[k]);
-    return m;
-  });
-  const isLow = (a, st) => num(a.min) > 0 && (st[a.id] || 0) <= num(a.min);
 
   // =============================================================== Synchronisierung
   const SYNC_BATCH = 200; // Änderungen pro Anfrage (Datenbank erlaubt bis 500)
@@ -446,6 +436,7 @@
       }
     }
     if (changedView || (firstSync && S.lastSync && S.user)) render({ fromSync: true });
+    if (S.user && S.lastSync) nlRefresh();
   }
 
   // Live-Verbindung: Supabase Realtime meldet jede neue Revision der Firma (companies.seq)
@@ -488,7 +479,7 @@
     S.company = me.company;
     S.members = me.members || [];
     safeLS.set('nexcount:last', { user: me.user, company: me.company });
-    if (userChanged) loadLocal();
+    if (userChanged) { loadLocal(); NL.status = null; NL.articles = []; NL.loadedAt = 0; nlRestore(); }
     render();
     if (offline) {
       S.online = false;
@@ -752,10 +743,6 @@
     return { net, tax, gross: r2(net + tax), rates };
   }
   const docTotals = (d) => memo(`doc:${d.id}:${d.updatedAt}`, () => calcTotals(d.items));
-  // Bestand wird nur für Produkte geführt – und nur, wenn NEXCOUNT Lager aktiv ist
-  const tracksStock = (a) => mod('inventory') && !!a && a.type !== 'service';
-  // Belege buchen Bestände nur, wenn das Lager mit der Buchhaltung verknüpft ist
-  const bookStock = (a) => stockLinked() && tracksStock(a);
   const isLate = (d) => d.status === 'open' && !!d.dueDate && d.dueDate < today();
 
   function nextDocNumber(kind, date) {
@@ -785,29 +772,16 @@
     if (!doc.number) doc.number = nextDocNumber(doc.kind, doc.date);
     doc.status = 'open';
     doc.finalizedAt = Date.now();
-    doc.movementIds = [];
-    if (doc.kind !== 'quote') {
+    if (doc.kind === 'purchase') {
       for (const it of doc.items) {
         const art = it.articleId ? articleRaw(it.articleId) : null;
-        if (!art || !num(it.qty)) continue;
-        if (bookStock(art)) {
-          const mv = put('movements', {
-            articleId: it.articleId,
-            qty: doc.kind === 'sale' ? -num(it.qty) : num(it.qty),
-            type: doc.kind,
-            date: doc.date,
-            unitCost: doc.kind === 'purchase' ? num(it.price) : num(art.ek),
-            docId: doc.id,
-            note: doc.number,
-          });
-          doc.movementIds.push(mv.id);
-        }
-        if (doc.kind === 'purchase' && num(it.price) > 0 && num(art.ek) !== num(it.price)) {
-          put('articles', { ...art, ek: num(it.price) }); // letzter Einkaufspreis
-        }
+        if (art && num(it.price) > 0 && num(art.ek) !== num(it.price)) put('articles', { ...art, ek: num(it.price) }); // letzter Einkaufspreis
       }
     }
-    return put('documents', doc);
+    // verbundene Lagerartikel: Warenausgang/-eingang in NEXLOGISTIC (sofort oder sobald online)
+    const saved = put('documents', nlMark(doc));
+    if (saved.nlBook) setTimeout(nlFlush, 0);
+    return saved;
   }
   // ---------- Zahlungen, Zahlungsziel, Skonto und Mahnwesen
   // Zahlungen liegen als Liste am Beleg (Teilzahlungen möglich). Ältere Belege ohne Liste gelten als voll bezahlt.
@@ -915,13 +889,16 @@
     return put('documents', { ...doc, payments, status: 'open', paidAt: '', entryId: payments.length ? payments[payments.length - 1].entryId : null });
   }
   function cancelDoc(doc) {
+    // Belege aus der Zeit vor NEXLOGISTIC: lokale Lagerbewegungen zurückbuchen
     for (const id of doc.movementIds || []) {
       const mv = get('movements', id);
       if (mv) put('movements', { articleId: mv.articleId, qty: -num(mv.qty), type: 'storno', date: today(), unitCost: mv.unitCost, docId: doc.id, note: `Storno ${doc.number}` });
     }
     const ids = new Set([doc.entryId, ...docPayments(doc).flatMap((p) => [p.entryId, p.extraEntryId])].filter(Boolean));
     for (const id of ids) if (get('entries', id)) del('entries', id);
-    return put('documents', { ...doc, status: 'cancelled', cancelledAt: Date.now(), entryId: null });
+    const saved = put('documents', { ...nlMarkCancel(doc), status: 'cancelled', cancelledAt: Date.now(), entryId: null });
+    if (saved.nlCancel) setTimeout(nlFlush, 0);
+    return saved;
   }
   // Angebot → Rechnungsentwurf (Positionen, Kunde und Texte werden übernommen)
   function convertQuote(q) {
@@ -941,10 +918,9 @@
   }
 
   // =============================================================== Shell & Rendering
-  // Zwei Bereiche: Buchhaltung und – als eigenes System – NEXCOUNT Lager
+  // Ein Bereich: Buchhaltung (das Lager ist die eigene App NEXLOGISTIC)
   const SPACES = {
     books: { label: 'Buchhaltung', icon: 'book', home: 'dashboard' },
-    stock: { label: 'Lager', icon: 'layers', home: 'stockhome' },
   };
   const todayLong = () => new Date().toLocaleDateString('de-AT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const VIEWS = {
@@ -962,13 +938,9 @@
     entries: { space: 'books', title: 'Kassabuch', short: 'Kassa', icon: 'book', group: 'money', render: viewEntries, sub: 'Alle Einnahmen und Ausgaben' },
     reports: { space: 'books', title: () => (isClub() ? 'Kassabericht' : 'Berichte'), short: 'Berichte', icon: 'chart', group: 'money', when: () => mod('reports'), render: viewReports,
       sub: () => (isClub() ? 'Einnahmen und Ausgaben nach Bereichen, Exporte' : 'Gewinn, Umsatzsteuer und Exporte') },
-    stockhome: { space: 'stock', title: 'Lager-Übersicht', short: 'Übersicht', icon: 'dashboard', group: 'stock', when: () => mod('inventory'), render: viewStockHome,
-      sub: () => (stockLinked() ? 'Mit der Buchhaltung verknüpft' : 'Eigenständig – nicht mit Belegen verknüpft') },
-    stockitems: { space: 'stock', title: 'Lagerartikel', short: 'Artikel', icon: 'tag', group: 'stock', when: () => mod('inventory'), render: viewStockItems, sub: 'Bestände, Mindestmengen und Lagerorte' },
-    stock: { space: 'stock', title: 'Bewegungen', short: 'Bewegungen', icon: 'sync', group: 'stock', when: () => mod('inventory'), render: viewStock, sub: 'Wareneingang, -ausgang, Inventur und Storno' },
     settings: { space: '*', title: 'Einstellungen', short: 'Einstellungen', icon: 'settings', group: 'system', render: viewSettings, sub: 'Organisation, Funktionen, Team und Konto' },
   };
-  const GROUPS = { start: '', club: () => 'Verein', sales: () => (isClub() ? 'Kontakte & Belege' : 'Verkauf & Kunden'), money: () => 'Finanzen', stock: () => 'NEXCOUNT Lager', system: '' };
+  const GROUPS = { start: '', club: () => 'Verein', sales: () => (isClub() ? 'Kontakte & Belege' : 'Verkauf & Kunden'), money: () => 'Finanzen', system: '' };
   const tv = (v, k) => (typeof v[k] === 'function' ? v[k]() : v[k]);
   const viewOn = (k) => !!VIEWS[k] && (!VIEWS[k].when || VIEWS[k].when());
   const inSpace = (k) => VIEWS[k].space === '*' || VIEWS[k].space === UI.space;
@@ -976,9 +948,6 @@
 
   // Einträge für „+ Neu“ und Schnellaktionen – je nach Bereich, Organisationsart und Funktionen
   function quickItems() {
-    if (UI.space === 'stock') {
-      return [['move-in', '', 'plus', 'Wareneingang'], ['move-out', '', 'minus', 'Warenausgang'], ['inventory', '', 'clipboard', 'Inventur'], ['new-stock-item', '', 'tag', 'Lagerartikel']];
-    }
     const items = [];
     if (mod('members')) items.push(['new-member', '', 'heart', 'Mitglied']);
     if (mod('donations')) items.push(['new-donation', '', 'gift', 'Spende']);
@@ -1023,18 +992,13 @@
   }
 
   function renderNav() {
-    const st = stockMap();
     const counts = {
-      stockitems: mod('inventory') ? stockArticles().filter((a) => isLow(a, st)).length : 0,
       documents: mod('invoices') ? all('documents').filter((d) => d.kind === 'sale' && isLate(d)).length : 0,
       dues: mod('dues') ? all('dues').filter((d) => d.status === 'open' && d.dueDate && d.dueDate < today()).length : 0,
     };
-    counts.stockhome = counts.stockitems;
-    const sw = $('#space-switch');
-    sw.innerHTML = mod('inventory')
-      ? `<div class="space-switch" role="tablist">${Object.entries(SPACES).map(([k, s]) => `<button type="button" role="tab" data-action="space" data-v="${k}" class="${UI.space === k ? 'active' : ''}">${icon(s.icon, 16)}<span>${s.label}</span>${k === 'stock' && counts.stockitems ? `<i class="dot-badge static"></i>` : ''}</button>`).join('')}</div>`
-      : '';
-    $('#brand-sub').textContent = UI.space === 'stock' ? 'Lager · by Andrerer' : 'by Andrerer';
+    UI.space = 'books';
+    $('#space-switch').innerHTML = '';
+    $('#brand-sub').textContent = 'by Andrerer';
     document.body.dataset.space = UI.space;
     let html = '';
     let lastGroup = null;
@@ -1046,10 +1010,10 @@
         else if (lastGroup) html += '<div class="nav-sep"></div>';
         lastGroup = v.group;
       }
-      html += `<a href="#/${k}" class="${k === UI.route ? 'active' : ''}">${icon(v.icon)}<span>${esc(tv(v, 'title'))}</span>${counts[k] && k !== 'stockhome' ? `<span class="count">${counts[k]}</span>` : ''}</a>`;
+      html += `<a href="#/${k}" class="${k === UI.route ? 'active' : ''}">${icon(v.icon)}<span>${esc(tv(v, 'title'))}</span>${counts[k] ? `<span class="count">${counts[k]}</span>` : ''}</a>`;
     }
     $('#nav').innerHTML = html;
-    const pref = UI.space === 'stock' ? ['stockhome', 'stockitems', 'stock'] : ['dashboard', 'members', 'documents', 'time', 'dues', 'entries', 'donations', 'contacts', 'articles'];
+    const pref = ['dashboard', 'members', 'documents', 'time', 'dues', 'entries', 'donations', 'contacts', 'articles'];
     const main = pref.filter(viewOn).slice(0, 4);
     $('#bottom-nav').innerHTML = main.map((k) => `<a href="#/${k}" class="${k === UI.route ? 'active' : ''}">${icon(VIEWS[k].icon, 20)}<span>${esc(VIEWS[k].short)}</span>${counts[k] ? '<i class="dot-badge"></i>' : ''}</a>`).join('')
       + `<button type="button" data-action="toggle-menu" class="${!main.includes(UI.route) ? 'active' : ''}">${icon('more', 20)}<span>Mehr</span></button>`;
@@ -1063,7 +1027,6 @@
     if (!viewOn(UI.route)) UI.route = 'dashboard';
     const view = VIEWS[UI.route];
     if (view.space !== '*') UI.space = view.space;
-    if (UI.space === 'stock' && !mod('inventory')) UI.space = 'books';
     renderNav();
     $('#me-avatar').textContent = initials(S.user.name);
     $('#me-name').textContent = S.user.name;
@@ -1186,7 +1149,7 @@
         <p class="muted small">Mindestens 8 Zeichen. Nach der Registrierung bekommst du eine E-Mail zur Bestätigung.</p>`;
     } else {
       inner = `<div class="stack" style="gap:6px"><h1>${forgot ? 'Passwort zurücksetzen' : 'Willkommen zurück'}</h1>
-          <p class="muted">${forgot ? 'Wir schicken dir einen Link, mit dem du ein neues Passwort festlegen kannst.' : 'Melde dich an, um deine Buchhaltung und dein Lager zu verwalten.'}</p></div>
+          <p class="muted">${forgot ? 'Wir schicken dir einen Link, mit dem du ein neues Passwort festlegen kannst.' : 'Melde dich an, um deine Buchhaltung zu verwalten.'}</p></div>
         ${tabs}${msgBox}
         <form data-form="auth" class="stack">
           ${field('E-Mail', `<input name="email" type="email" required maxlength="120" autocomplete="email" value="${esc(authEmail)}">`)}
@@ -1235,11 +1198,11 @@
       <div class="auth-hero">
         <span class="hero-eyebrow">NEXCOUNT by Andrerer</span>
         <h2>Das Buchhaltungs- und Lagersystem für die Kleinen.</h2>
-        <p>Für Selbstständige, Dienstleister, Kleinunternehmen und Vereine in Österreich – jeweils mit den Funktionen, die wirklich gebraucht werden. Das Lager ist ein eigenes System, das du bei Bedarf dazuschaltest und verknüpfst.</p>
+        <p>Für Selbstständige, Dienstleister, Kleinunternehmen und Vereine in Österreich – jeweils mit den Funktionen, die wirklich gebraucht werden. Ein Lager führst du in NEXLOGISTIC und verknüpfst es bei Bedarf.</p>
         <ul>
           <li>${icon('briefcase', 20)}<div><b>Unternehmen & Selbstständige</b><span>Angebote, Rechnungen, Zeiterfassung, Kassabuch und Steuerübersicht.</span></div></li>
           <li>${icon('heart', 20)}<div><b>Vereine</b><span>Mitglieder, Beitragsläufe, Spenden mit Spendenmeldung, Kassabericht.</span></div></li>
-          <li>${icon('layers', 20)}<div><b>NEXCOUNT Lager</b><span>Eigenes System für Bestände – eigenständig oder mit der Buchhaltung verknüpft.</span></div></li>
+          <li>${icon('layers', 20)}<div><b>Mit NEXLOGISTIC verknüpfbar</b><span>Lager & Logistik der NEX-Familie: Rechnungen buchen Bestände automatisch.</span></div></li>
           <li>${icon('zap', 20)}<div><b>Live, offline & im Team</b><span>Alle Geräte synchron, Einladungscode für Mitarbeiter und Vorstand.</span></div></li>
         </ul>
       </div>
@@ -1276,7 +1239,7 @@
   const greeting = () => { const h = new Date().getHours(); return h < 11 ? 'Guten Morgen' : h < 18 ? 'Hallo' : 'Guten Abend'; };
   const firstName = () => esc(String(S.user.name || '').split(' ')[0]);
 
-  // Funktionen mit Schaltern – empfohlene zuerst, NEXCOUNT Lager als eigenes System mit Verknüpfung
+  // Funktionen mit Schaltern – empfohlene zuerst; das Lager ist die eigene App NEXLOGISTIC (verknüpfbar)
   function moduleList(mods, scope, readOnly = false, linkOn = true, recommended = null) {
     const row = (k, def, on, fixed, extraCls = '') => {
       const needs = (def.requires || []).map((r) => MODULES[r].label);
@@ -1287,23 +1250,15 @@
       </label>`;
     };
     const rec = recommended || [];
-    const keys = ALL_MODULES.filter((k) => k !== 'inventory');
+    const keys = ALL_MODULES;
     const first = rec.length ? keys.filter((k) => rec.includes(k)) : keys;
     const rest = rec.length ? keys.filter((k) => !rec.includes(k)) : [];
-    const lager = `<div class="system-card ${mods.inventory ? 'on' : ''}">
-        ${row('inventory', MODULES.inventory, !!mods.inventory, false, 'system')}
-        ${mods.inventory ? `<label class="module sub ${linkOn ? 'on' : ''} ${readOnly ? 'ro' : ''}">
-          <span class="module-ic">${icon('link', 18)}</span>
-          <span class="module-txt"><b>Mit der Buchhaltung verknüpfen</b><small>${linkOn ? 'Rechnungen buchen Ware ab, Eingangsrechnungen buchen zu, Lagerartikel stehen in der Preisliste.' : 'Das Lager läuft eigenständig – Belege verändern keine Bestände (z. B. für Material, Inventar, Ausleihe).'}</small></span>
-          <input type="checkbox" class="switch" data-link data-scope="${scope}" ${linkOn ? 'checked' : ''} ${readOnly ? 'disabled' : ''} aria-label="Lager verknüpfen">
-        </label>` : ''}
-      </div>`;
     return `<div class="module-list">
       ${row('entries', { label: 'Kassabuch', icon: 'book', desc: 'Einnahmen und Ausgaben – das Herz deiner Buchhaltung. Immer aktiv.' }, true, true)}
       ${first.map((k) => row(k, MODULES[k], !!mods[k], false)).join('')}
       ${rest.length ? `<div class="list-divider">Weitere Funktionen</div>${rest.map((k) => row(k, MODULES[k], !!mods[k], false)).join('')}` : ''}
-      <div class="list-divider">Eigenes System</div>
-      ${lager}
+      <div class="list-divider">NEX-Familie</div>
+      ${nlCard(scope)}
     </div>`;
   }
 
@@ -1371,7 +1326,7 @@
         </div>`;
     } else {
       body = `<div class="setup-head"><h2>Welche Funktionen brauchst du?</h2>
-          <p class="muted">Für <b>${esc(T.label)}</b> haben wir passende Funktionen vorgeschlagen. Das Lager ist ein eigenes System – schalte es nur ein, wenn du Bestände führen willst.</p></div>
+          <p class="muted">Für <b>${esc(T.label)}</b> haben wir passende Funktionen vorgeschlagen. Ein Lager führst du in NEXLOGISTIC und verknüpfst es bei Bedarf.</p></div>
         ${moduleList(st.modules, 'setup', false, st.inventoryLink, T.modules)}`;
     }
     const next = st.step === 1
@@ -1398,7 +1353,6 @@
       mod('catalog') && ['Produkte & Leistungen anlegen', 'Mit Preisen – dann sind Rechnungspositionen ein Klick.', '#/articles'],
       mod('contacts') && !club && ['Kunden anlegen', 'Unter Kunden & Lieferanten.', '#/contacts'],
       mod('time') && ['Erste Zeit erfassen', 'Mit Kunde und Projekt – später mit einem Klick abrechnen.', '#/time'],
-      mod('inventory') && ['Lager einrichten', 'Im Bereich „Lager“ Artikel mit Anfangsbestand anlegen.', '#/stockitems'],
       ['Team einladen', 'Einladungscode unter Einstellungen → Team teilen.', '#/settings', 'team'],
     ].filter(Boolean);
     return `<div class="welcome">
@@ -1440,12 +1394,12 @@
     const panels = [chart];
     let note = 'Alles im grünen Bereich.';
 
-    // Lager als eigenes System: kurzer Hinweis mit Sprung in den Lager-Bereich
-    const st = stockMap();
-    const low = mod('inventory') ? stockArticles().filter((a) => isLow(a, st)) : [];
-    const stockTeaser = mod('inventory') ? `<section class="system-teaser">${icon('layers', 22)}<div><b>NEXCOUNT Lager</b>
-      <span>${low.length ? `<span class="neg">${low.length} ${low.length === 1 ? 'Artikel' : 'Artikel'} unter Mindestbestand</span> · ` : ''}Lagerwert ${money(sum(stockArticles(), (a) => Math.max(0, st[a.id] || 0) * num(a.ek)))} · ${stockLinked() ? 'verknüpft' : 'eigenständig'}</span></div>
-      <button class="btn sm" data-action="space" data-v="stock">Zum Lager ${icon('arrowRight', 14)}</button></section>` : '';
+    // Verknüpftes Lager (NEXLOGISTIC): kurzer Hinweis auf knappe Artikel
+    nlRefresh();
+    const low = nlLinked() ? NL.articles.filter((x) => !x.archived && nlLow(x)) : [];
+    const stockTeaser = nlLinked() ? `<section class="system-teaser">${icon('layers', 22)}<div><b>NEXLOGISTIC · Lager</b>
+      <span>${low.length ? `<span class="neg">${low.length} Artikel unter Mindestbestand</span> · ` : 'Alle Bestände über Mindestbestand · '}${fmtNum(NL.articles.filter((x) => !x.archived).length)} Lagerartikel · verknüpft</span></div>
+      <a class="btn sm" href="${NL_URL}" target="_blank" rel="noopener">Lager öffnen ${icon('arrowRight', 14)}</a></section>` : '';
 
     if (isClub()) {
       const yE = entries.filter((e) => String(e.date || '').startsWith(year));
@@ -1512,7 +1466,7 @@
           'send', 'Keine offenen Angebote.'));
       }
     }
-    if (low.length && note === 'Alles im grünen Bereich.') note = `Im Lager ${low.length === 1 ? 'liegt 1 Artikel' : `liegen ${low.length} Artikel`} unter dem Mindestbestand.`;
+    if (low.length && note === 'Alles im grünen Bereich.') note = `In NEXLOGISTIC ${low.length === 1 ? 'liegt 1 Artikel' : `liegen ${low.length} Artikel`} unter dem Mindestbestand.`;
     panels.push(listPanel('Letzte Buchungen', '<a href="#/entries">Kassabuch</a>', recent, 'book', 'Noch keine Buchungen.'));
 
     const tip = !orgType() && S.user.role === 'admin'
@@ -1529,22 +1483,187 @@
       <div class="grid-2 panels">${panels.join('')}</div>`;
   }
 
+  // =============================================================== NEXLOGISTIC (Lager & Logistik) – Verknüpfung
+  // Das Lager ist eine eigene App der NEX-Familie. Ist sie verknüpft, zeigt die Preisliste Bestände,
+  // Rechnungen buchen Warenausgänge und Eingangsrechnungen Wareneingänge – über Datenbankfunktionen (nl_link_*).
+  const NL_URL = 'https://nexlogistic.andrerer.org/';
+  const NL = { status: null, articles: [], loadedAt: 0, loading: false, error: '' };
+  const nlKey = () => `nexcount:nl:${S.company && S.company.id}`;
+  const nlLinked = () => !!(NL.status && NL.status.linked);
+  const nlArticle = (id) => (id && NL.articles.find((x) => x.id === id)) || null;
+  const nlLow = (x) => !!x && num(x.min) > 0 && num(x.stock) <= num(x.min);
+  function nlRestore() {
+    const c = safeLS.get(nlKey());
+    if (c && c.status) Object.assign(NL, { status: c.status, articles: c.articles || [], loadedAt: 0 });
+  }
+  async function nlRefresh(force = false) {
+    if (!S.user || !S.company || NL.loading || !navigator.onLine) return;
+    if (!force && NL.loadedAt && Date.now() - NL.loadedAt < 60000) return;
+    NL.loading = true;
+    try {
+      NL.status = await rpc('nl_link_status');
+      NL.articles = nlLinked() ? (await rpc('nl_link_articles')) || [] : [];
+      NL.error = '';
+      NL.loadedAt = Date.now();
+      safeLS.set(nlKey(), { status: NL.status, articles: NL.articles });
+      await nlFlush();
+    } catch (err) {
+      NL.error = err.message;
+      NL.loadedAt = Date.now();
+    } finally {
+      NL.loading = false;
+    }
+    if (['articles', 'settings', 'dashboard', 'documents'].includes(UI.route) && !UI.formDirty && !$('#modal-root').innerHTML) render();
+  }
+  // Positionen eines Belegs, die mit NEXLOGISTIC-Lagerartikeln verbunden sind
+  function nlLines(doc) {
+    return (doc.items || []).map((it) => {
+      const a = it.articleId ? articleRaw(it.articleId) : null;
+      return a && a.nlArticleId && num(it.qty) ? { articleId: a.nlArticleId, qty: num(it.qty), ...(doc.kind === 'purchase' ? { unitCost: num(it.price) } : {}) } : null;
+    }).filter(Boolean);
+  }
+  // Festgeschriebene Rechnung / erfasste Eingangsrechnung → Lagerbuchung vormerken (wird sofort oder später gesendet)
+  function nlMark(doc) {
+    if (doc.kind === 'quote' || !nlLinked()) return doc;
+    const lines = nlLines(doc);
+    return lines.length ? { ...doc, nlBook: { state: 'pending', lines } } : doc;
+  }
+  function nlMarkCancel(doc) {
+    return doc.nlBook && doc.nlBook.state !== 'skipped' ? { ...doc, nlCancel: { state: 'pending' } } : doc;
+  }
+  // Offene Lagerbuchungen senden – idempotent, doppelte Aufrufe buchen nichts doppelt
+  async function nlFlush() {
+    if (!nlLinked() || !navigator.onLine) return;
+    const docs = all('documents').filter((d) => (d.nlBook && d.nlBook.state === 'pending') || (d.nlCancel && d.nlCancel.state === 'pending'));
+    for (const d of docs) {
+      const kind = d.kind === 'purchase' ? 'purchase' : 'sale';
+      const ref = kind === 'purchase' ? d.reference || d.number : d.number;
+      try {
+        if (d.nlBook && d.nlBook.state === 'pending') {
+          const r = await rpc('nl_link_book', { p_doc: d.id, p_ref: ref, p_kind: kind, p_date: d.date, p_lines: d.nlBook.lines, p_cancel: false });
+          put('documents', { ...get('documents', d.id), nlBook: { ...d.nlBook, state: 'done', at: Date.now(), warnings: (r && r.warnings) || [], error: '' } });
+          if (r && r.warnings && r.warnings.length) toast(`${d.number}: Bestand unter 0 bei ${r.warnings.map((w) => w.name).join(', ')}`);
+        }
+        const cur = get('documents', d.id);
+        if (cur.nlCancel && cur.nlCancel.state === 'pending') {
+          await rpc('nl_link_book', { p_doc: d.id, p_ref: ref, p_kind: kind, p_date: today(), p_lines: (cur.nlBook && cur.nlBook.lines) || [], p_cancel: true });
+          put('documents', { ...cur, nlCancel: { state: 'done', at: Date.now() } });
+        }
+      } catch (err) {
+        const cur = get('documents', d.id);
+        if (cur.nlBook && cur.nlBook.state === 'pending') put('documents', { ...cur, nlBook: { ...cur.nlBook, error: err.message } });
+        if (err.offline) break;
+      }
+    }
+    if (docs.length) NL.articles = (await rpc('nl_link_articles').catch(() => NL.articles)) || NL.articles;
+  }
+  // Bisheriges NEXCOUNT-Lager: Artikel mit Bestand oder Bewegungen (vor der Trennung in NEXLOGISTIC)
+  const legacyStock = () => memo('legacy-stock', () => {
+    const st = {};
+    for (const mv of all('movements')) st[mv.articleId] = r3((st[mv.articleId] || 0) + num(mv.qty));
+    const arts = all('articles').filter((a) => !a.archived && a.type !== 'service' && !a.nlArticleId && (a.id in st || num(a.min) > 0 || a.sellable === false));
+    return arts.map((a) => ({ a, stock: st[a.id] || 0 }));
+  });
+  function nlStatusBadge() {
+    if (NL.loading && !NL.status) return '<span class="badge">wird geprüft …</span>';
+    return nlLinked() ? '<span class="badge ok">verknüpft</span>' : '<span class="badge">nicht verknüpft</span>';
+  }
+  // Karte in Einstellungen → Funktionen (und als Hinweis im Einrichtungsassistenten)
+  function nlCard(scope) {
+    if (scope === 'setup') {
+      return `<div class="system-card">
+        <div class="module system"><span class="module-ic">${icon('layers', 18)}</span>
+          <span class="module-txt"><b>Lager? → NEXLOGISTIC</b><small>Bestände, Wareneingang, Inventur und Versand führst du in NEXLOGISTIC, der Lager-App der NEX-Familie (mit demselben Konto). Danach unter Einstellungen → Funktionen verknüpfen – Rechnungen buchen dann automatisch ab.</small></span></div>
+      </div>`;
+    }
+    if (!NL.loadedAt && !NL.loading) nlRefresh();
+    const st = NL.status || {};
+    const admin = S.user.role === 'admin';
+    const legacy = legacyStock();
+    let body;
+    if (NL.error && !NL.status) {
+      body = `<p class="muted small">${esc(NL.error)}</p>`;
+    } else if (nlLinked()) {
+      const mapped = catalogArticles().filter((a) => a.nlArticleId).length;
+      body = `<p class="small">Verknüpft mit <b>${esc(st.linked.name || '–')}</b> seit ${new Date(st.linked.at).toLocaleDateString('de-AT')}. ${fmtNum(NL.articles.filter((x) => !x.archived).length)} Lagerartikel, ${fmtNum(mapped)} davon in deiner Preisliste.</p>
+        <ul class="muted small" style="margin:8px 0 0 18px"><li>Festgeschriebene Rechnungen buchen Warenausgänge, erfasste Eingangsrechnungen Wareneingänge (mit Einkaufspreis).</li><li>Stornos buchen zurück. Ohne Internet werden Buchungen nachgeholt.</li></ul>
+        <div class="toolbar" style="margin-top:10px">
+          ${mod('catalog') ? `<button class="btn sm" data-action="nl-import-articles">${icon('download', 14)} Lagerartikel in die Preisliste</button>` : ''}
+          <a class="btn sm ghost" href="${NL_URL}" target="_blank" rel="noopener">${icon('arrowRight', 14)} NEXLOGISTIC öffnen</a>
+          ${admin ? '<button class="btn sm danger" data-action="nl-unlink">Trennen</button>' : ''}
+        </div>
+        ${legacy.length && admin ? `<div class="alert info" style="margin-top:12px">Im alten NEXCOUNT-Lager liegen noch ${legacy.length} Artikel. <button class="btn sm" data-action="nl-migrate">Nach NEXLOGISTIC übernehmen</button></div>` : ''}`;
+    } else {
+      body = `<p class="small">Bestände, Wareneingang, Inventur und Versand führst du in <b>NEXLOGISTIC</b> – der Lager-App der NEX-Familie, mit demselben Andrerer-Konto. Verknüpft zeigt die Preisliste die Bestände und Rechnungen buchen automatisch ab.</p>
+        ${!admin ? '<p class="muted small" style="margin-top:8px">Verknüpfen kann ein Administrator.</p>'
+          : `<div class="toolbar" style="margin-top:10px">
+            ${st.direct ? `<button class="btn sm primary" data-action="nl-link-direct">${icon('link', 14)} Mit „${esc(st.direct.name)}“ verknüpfen</button>` : ''}
+            <form data-form="nl-link" class="inline-form"><input name="code" placeholder="Code NC-…" maxlength="12" autocomplete="off" style="text-transform:uppercase;width:150px"><button class="btn sm">Code einlösen</button></form>
+            <a class="btn sm ghost" href="${NL_URL}" target="_blank" rel="noopener">NEXLOGISTIC öffnen</a>
+          </div>
+          <p class="muted small" style="margin-top:8px">Den Code erzeugst du in NEXLOGISTIC unter Einstellungen → Verknüpfung mit NEXCOUNT.${st.direct ? ' Da du dort auch Admin bist, geht es auch direkt mit einem Klick.' : ''}</p>`}
+        ${legacy.length ? `<div class="alert info" style="margin-top:12px">Dein bisheriges NEXCOUNT-Lager (${legacy.length} Artikel${all('movements').length ? `, ${all('movements').length} Bewegungen` : ''}) bleibt gespeichert. Nach dem Verknüpfen übernimmst du es mit einem Klick nach NEXLOGISTIC – oder exportierst es: <button class="btn sm ghost" data-action="export" data-what="legacy-stock">${icon('download', 14)} CSV</button></div>` : ''}`;
+    }
+    return `<div class="system-card on">
+      <div class="module system"><span class="module-ic">${icon('layers', 18)}</span>
+        <span class="module-txt"><b>NEXLOGISTIC · Lager & Logistik</b><small>Eigene App der NEX-Familie – optional mit der Buchhaltung verknüpft.</small></span>${nlStatusBadge()}</div>
+      <div class="nl-body">${body}</div>
+    </div>`;
+  }
+  // Lagerartikel aus NEXLOGISTIC in die Preisliste übernehmen (Verkaufspreis ergänzt man danach)
+  function openNlImport() {
+    const mapped = new Set(all('articles').filter((a) => a.nlArticleId).map((a) => a.nlArticleId));
+    const free = NL.articles.filter((x) => !x.archived && !mapped.has(x.id));
+    if (!free.length) return toast('Alle Lagerartikel aus NEXLOGISTIC sind bereits in der Preisliste.');
+    openModal({
+      title: 'Lagerartikel aus NEXLOGISTIC übernehmen',
+      wide: true,
+      body: `<p class="muted small">Ausgewählte Artikel werden als Produkte in die Preisliste übernommen und mit NEXLOGISTIC verbunden. Den Verkaufspreis trägst du danach ein.</p>
+        <div class="table-wrap"><table><thead><tr><th><input type="checkbox" id="nl-all" checked aria-label="Alle"></th><th>Nr.</th><th>Bezeichnung</th><th>Einheit</th><th class="num">Bestand</th><th class="num">EK</th></tr></thead>
+        <tbody>${free.map((x) => `<tr><td><input type="checkbox" name="nl_${esc(x.id)}" checked></td><td class="muted">${esc(x.sku || '')}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.unit || '')}</td><td class="num">${fmtNum(x.stock)}</td><td class="num">${money(x.cost)}</td></tr>`).join('')}</tbody></table></div>`,
+      submit: 'Übernehmen',
+      onMount(f) { $('#nl-all', f).addEventListener('change', (e) => $$('input[name^="nl_"]', f).forEach((c) => { c.checked = e.target.checked; })); },
+      onSubmit(fd) {
+        const smallBiz = !!settings().smallBusiness;
+        let n = 0;
+        for (const x of free) {
+          if (fd[`nl_${x.id}`] !== 'on') continue;
+          const sku = x.sku && !all('articles').some((a) => a.sku === x.sku && !a.archived) ? x.sku : nextCode('articles', 'A', 'sku');
+          put('articles', { type: 'product', sku, name: x.name, unit: x.unit || 'Stk', category: x.category || '', ek: num(x.cost), vk: 0, tax: smallBiz ? 0 : 20, sellable: true, nlArticleId: x.id });
+          n++;
+        }
+        toast(`${n} ${n === 1 ? 'Artikel' : 'Artikel'} übernommen – Verkaufspreise bitte ergänzen.`, 'ok');
+      },
+    });
+  }
+  // Bisheriges NEXCOUNT-Lager nach NEXLOGISTIC übernehmen (Artikel + aktueller Bestand als Anfangsbestand)
+  async function nlMigrate() {
+    const legacy = legacyStock();
+    if (!legacy.length) return;
+    if (!confirm(`${legacy.length} Artikel mit ihrem aktuellen Bestand nach NEXLOGISTIC übernehmen? Danach führst du Bestände nur noch dort.`)) return;
+    const payload = legacy.map(({ a, stock }) => ({ ncId: a.id, name: a.name, sku: a.sku, unit: a.unit, ean: a.ean || '', category: a.category || '', cost: num(a.ek), min: num(a.min), stock, location: a.location || '' }));
+    const res = await rpc('nl_link_import', { p_articles: payload });
+    for (const m of (res && res.map) || []) {
+      const a = get('articles', m.ncId);
+      if (a) put('articles', { ...a, nlArticleId: m.nlId, sellable: a.sellable !== false });
+    }
+    await nlRefresh(true);
+    toast(`${(res && res.created) || 0} Artikel in NEXLOGISTIC angelegt`, 'ok');
+    render();
+  }
+
   // =============================================================== Ansicht: Produkte & Leistungen (Preisliste)
-  // Lagerartikel = Produkte; in der Preisliste stehen nur Artikel, die verkauft werden (sellable)
-  const stockArticles = () => articles().filter((a) => a.type !== 'service');
   const catalogArticles = () => articles().filter((a) => a.sellable !== false);
-  function articleOptions(selected, { withStock = true, placeholder = 'Artikel wählen …', productsOnly = false } = {}) {
-    const st = stockMap();
-    const list = productsOnly ? stockArticles() : catalogArticles();
-    return `<option value="">${esc(placeholder)}</option>${list.map((a) => `<option value="${a.id}" ${a.id === selected ? 'selected' : ''}>${esc(a.sku)} – ${esc(a.name)}${withStock && (productsOnly ? tracksStock(a) : bookStock(a)) ? ` (${fmtNum(st[a.id] || 0)} ${esc(a.unit || '')})` : ''}</option>`).join('')}`;
+  function articleOptions(selected, { withStock = true, placeholder = 'Artikel wählen …' } = {}) {
+    return `<option value="">${esc(placeholder)}</option>${catalogArticles().map((a) => { const x = withStock ? nlArticle(a.nlArticleId) : null; return `<option value="${a.id}" ${a.id === selected ? 'selected' : ''}>${esc(a.sku)} – ${esc(a.name)}${x ? ` (${fmtNum(x.stock)} ${esc(a.unit || '')})` : ''}</option>`; }).join('')}`;
   }
   const marginOf = (a) => { const vk = num(a.vk); return vk > 0 && num(a.ek) > 0 ? ((vk - num(a.ek)) / vk) * 100 : null; };
   const marginCell = (a) => { const m = marginOf(a); return `<td class="num ${m != null && m < 0 ? 'neg' : ''}">${m == null ? '—' : `${m.toFixed(1).replace('.', ',')} %`}</td>`; };
 
   function viewArticles() {
-    const st = stockMap();
+    nlRefresh();
     const all_ = catalogArticles();
-    const linked = stockLinked();
+    const linked = nlLinked();
     const cats = [...new Set(all_.map((a) => a.category).filter(Boolean))].sort();
     const q = (UI.q.art || '').toLowerCase();
     let list = all_;
@@ -1552,24 +1671,31 @@
     if (UI.q.artCat) list = list.filter((a) => a.category === UI.q.artCat);
     if (UI.q.artType) list = list.filter((a) => (a.type || 'product') === UI.q.artType);
     const typeBadge = (a) => (a.type === 'service' ? '<span class="badge info">Leistung</span>' : '');
+    const stockCell = (a) => {
+      const x = nlArticle(a.nlArticleId);
+      if (!a.nlArticleId) return '<span class="muted">—</span>';
+      if (!x) return '<span class="muted" title="Lagerartikel nicht gefunden">?</span>';
+      return nlLow(x) ? `<span class="badge low">${fmtNum(x.stock)}</span>` : fmtNum(x.stock);
+    };
     return `
       <div class="toolbar">
         ${searchBox('art', 'Produkte und Leistungen suchen …')}
         ${uiSelect('artType', [['', 'Produkte & Leistungen'], ['product', 'Nur Produkte'], ['service', 'Nur Leistungen']])}
         ${cats.length ? uiSelect('artCat', [['', 'Alle Kategorien'], ...cats.map((c) => [c, c])]) : ''}
         <div class="actions">
+          ${linked ? `<button class="btn" data-action="nl-import-articles" title="Lagerartikel aus NEXLOGISTIC übernehmen">${icon('layers', 16)} Aus Lager</button>` : ''}
           <button class="btn" data-action="new-article" data-kind="service">${icon('briefcase', 16)} Leistung</button>
           <button class="btn primary" data-action="new-article" data-kind="product">${icon('plus', 16)} Produkt</button>
         </div>
       </div>
-      ${mod('inventory') ? `<div class="hint-bar">${icon(linked ? 'link' : 'layers', 16)}<span>${linked ? 'Verknüpft mit NEXCOUNT Lager: Produkte zeigen ihren Bestand, Rechnungen buchen ab.' : 'NEXCOUNT Lager läuft eigenständig – Lagerartikel erscheinen nur hier, wenn sie als „verkäuflich“ markiert sind.'}</span><button class="btn sm ghost" data-action="space" data-v="stock">Zum Lager</button></div>` : ''}
+      ${linked ? `<div class="hint-bar">${icon('link', 16)}<span>Verknüpft mit NEXLOGISTIC (${esc(NL.status.linked.name || '')}): Produkte mit Lagerartikel zeigen ihren Bestand, Rechnungen buchen ab.</span><a class="btn sm ghost" href="${NL_URL}" target="_blank" rel="noopener">Lager öffnen</a></div>` : ''}
       <section class="card flush">
         ${list.length ? `<div class="table-wrap"><table>
           <thead><tr><th>Nr.</th><th>Bezeichnung</th><th>Kategorie</th><th>Einheit</th><th class="num">Preis netto</th><th class="num">USt</th><th class="num">Marge</th>${linked ? '<th class="num">Bestand</th>' : ''}</tr></thead>
           <tbody>${list.map((a) => `<tr class="clickable" data-action="edit-article" data-id="${a.id}">
             <td class="muted">${esc(a.sku)}</td><td><b>${esc(a.name)}</b> ${typeBadge(a)}${a.description ? `<span class="sub">${esc(a.description.slice(0, 80))}</span>` : ''}</td>
             <td>${esc(a.category || '—')}</td><td>${esc(a.unit || '')}</td><td class="num"><b>${money(a.vk)}</b></td><td class="num muted">${num(a.tax)} %</td>${marginCell(a)}
-            ${linked ? `<td class="num">${bookStock(a) ? (isLow(a, st) ? `<span class="badge low">${fmtNum(st[a.id] || 0)}</span>` : fmtNum(st[a.id] || 0)) : '<span class="muted">—</span>'}</td>` : ''}</tr>`).join('')}</tbody>
+            ${linked ? `<td class="num">${stockCell(a)}</td>` : ''}</tr>`).join('')}</tbody>
           <tfoot><tr><td colspan="${linked ? 8 : 7}">${list.length} Einträge</td></tr></tfoot>
         </table></div>`
         : empty('tag', all_.length ? 'Nichts gefunden für diesen Filter.' : 'Noch nichts angelegt. Lege deine Produkte und Leistungen mit Preisen an – dann sind Rechnungspositionen nur noch ein Klick.',
@@ -1577,65 +1703,62 @@
       </section>`;
   }
 
-  // Ein Formular für Preisliste und Lager. ctx = 'books' (Preisliste) oder 'stock' (Lagerartikel)
-  function openArticle(id, presetType, ctx = UI.space === 'stock' ? 'stock' : 'books') {
+  function openArticle(id, presetType) {
     const a = id ? get('articles', id) : null;
     const isNew = !a;
-    const inv = mod('inventory');
-    const linked = stockLinked();
-    const inStock = ctx === 'stock';
+    const linked = nlLinked();
     const smallBiz = !!settings().smallBusiness;
-    const type0 = inStock ? 'product' : (a && a.type) || (presetType === 'service' || presetType === 'product' ? presetType : 'service');
-    const d = a || { sku: nextCode('articles', inStock ? 'L' : 'A', 'sku'), unit: type0 === 'service' ? 'Std' : 'Stk', tax: smallBiz ? 0 : 20, ek: '', vk: '', min: '', sellable: inStock ? linked && mod('catalog') : true };
+    const type0 = (a && a.type) || (presetType === 'service' || presetType === 'product' ? presetType : 'service');
+    const d = a || { sku: nextCode('articles', 'A', 'sku'), unit: type0 === 'service' ? 'Std' : 'Stk', tax: smallBiz ? 0 : 20, ek: '', vk: '', sellable: true };
     const cats = all('articles').map((x) => x.category).filter(Boolean);
-    const locs = all('articles').map((x) => x.location).filter(Boolean);
-    const st = stockMap();
-    const showStock = inv && (inStock || linked);
-    const stockFields = showStock ? `
-          <div class="form-section span2 only-product">${icon('layers', 14)} NEXCOUNT Lager</div>
-          ${field('EAN / Barcode', inp('ean', d.ean, 'maxlength="40" inputmode="numeric"'), 'only-product')}
-          ${field('Lagerort', inp('location', d.location, 'list="dl-loc" maxlength="60" placeholder="z. B. Regal A3"'), 'only-product')}
-          ${field('Mindestbestand', numInp('min', d.min, 'min="0"'), 'only-product')}
-          ${isNew ? field('Anfangsbestand', numInp('initial', '', 'min="0" placeholder="0"'), 'only-product')
-            : field('Aktueller Bestand', `<input readonly value="${esc(`${fmtNum(st[a.id] || 0)} ${a.unit || ''}`)}">`, 'only-product')}` : '';
-    const sellToggle = inStock && mod('catalog')
-      ? `<label class="check span2"><input type="checkbox" name="sellable" ${d.sellable !== false ? 'checked' : ''}> Auch in der Preisliste der Buchhaltung anbieten (verkäuflich)</label>` : '';
+    const taken = new Set(all('articles').filter((x) => x.nlArticleId && x.id !== (a && a.id)).map((x) => x.nlArticleId));
+    const nlOpts = NL.articles.filter((x) => !x.archived && (!taken.has(x.id) || x.id === d.nlArticleId));
+    const nlSel = linked ? `
+          <div class="form-section span2 only-product">${icon('layers', 14)} Lager (NEXLOGISTIC)</div>
+          ${field('Lagerartikel', `<select name="nlArticleId"><option value="">— nicht mit dem Lager verbunden —</option>${nlOpts.map((x) => `<option value="${esc(x.id)}" ${x.id === d.nlArticleId ? 'selected' : ''}>${esc(x.sku ? `${x.sku} – ` : '')}${esc(x.name)} · Bestand ${fmtNum(x.stock)} ${esc(x.unit || '')}</option>`).join('')}</select>`, 'span2 only-product')}
+          <p class="muted small span2 only-product">Verbundene Produkte zeigen den Bestand und buchen beim Festschreiben einer Rechnung bzw. Eingangsrechnung automatisch im Lager.</p>`
+      : d.nlArticleId ? '<p class="muted small span2 only-product">Mit einem NEXLOGISTIC-Lagerartikel verbunden (Verknüpfung derzeit nicht aktiv).</p>' : '';
     openModal({
-      title: isNew ? (inStock ? 'Neuer Lagerartikel' : type0 === 'service' ? 'Neue Leistung' : 'Neues Produkt') : a.name,
+      title: isNew ? (type0 === 'service' ? 'Neue Leistung' : 'Neues Produkt') : a.name,
       body: `<div class="grid2">
-          ${inStock ? '<input type="hidden" name="type" value="product">' : field('Art', selectEl('type', Object.entries(ART_TYPES), type0))}
+          ${field('Art', selectEl('type', Object.entries(ART_TYPES), type0))}
           ${field('Nummer', inp('sku', d.sku, 'required maxlength="40"'))}
-          ${field('Bezeichnung', inp('name', d.name, 'required maxlength="160"'), inStock ? '' : 'span2')}
+          ${field('Bezeichnung', inp('name', d.name, 'required maxlength="160"'), 'span2')}
           ${field('Kategorie', inp('category', d.category, 'list="dl-cat" maxlength="60"'))}
           ${field('Einheit', inp('unit', d.unit, 'list="dl-unit" maxlength="20"'))}
-          ${!inStock || mod('catalog') ? field('Verkaufspreis netto (€)', numInp('vk', d.vk, 'min="0"')) : ''}
-          ${!inStock || mod('catalog') ? field('USt-Satz', selectEl('tax', RATES, d.tax ?? 20)) : ''}
-          ${field(inv ? 'Einkaufspreis / Wert netto (€)' : 'Eigene Kosten netto (€, optional)', numInp('ek', d.ek, 'min="0"'))}
-          ${!inStock || mod('catalog') ? '<div class="field"><span>Marge</span><input id="art-margin" readonly></div>' : ''}
-          ${sellToggle}
-          ${stockFields}
+          ${field('Verkaufspreis netto (€)', numInp('vk', d.vk, 'min="0"'))}
+          ${field('USt-Satz', selectEl('tax', RATES, d.tax ?? 20))}
+          ${field('Einkaufspreis / Kosten netto (€, optional)', numInp('ek', d.ek, 'min="0"'))}
+          <div class="field"><span>Marge</span><input id="art-margin" readonly></div>
+          ${nlSel}
           ${field('Beschreibung (erscheint nicht auf Belegen)', textarea('description', d.description, 'maxlength="2000" rows="2"'), 'span2')}
-        </div>${datalist('dl-cat', cats)}${datalist('dl-unit', UNITS)}${datalist('dl-loc', locs)}`,
-      extra: isNew ? '' : `<button type="button" class="btn danger" data-action="archive-article" data-id="${a.id}">Archivieren</button>
-        ${tracksStock(a) ? `<button type="button" class="btn" data-action="inventory" data-id="${a.id}">Inventur</button>` : ''}`,
+        </div>${datalist('dl-cat', cats)}${datalist('dl-unit', UNITS)}`,
+      extra: isNew ? '' : `<button type="button" class="btn danger" data-action="archive-article" data-id="${a.id}">Archivieren</button>`,
       onMount(form) {
         const typeSel = $('select[name=type]', form);
         const unit = $('[name=unit]', form);
         const syncType = () => {
-          const svc = typeSel && typeSel.value === 'service';
+          const svc = typeSel.value === 'service';
           $$('.only-product', form).forEach((el) => el.classList.toggle('hidden', svc));
         };
-        if (typeSel) typeSel.addEventListener('change', () => {
+        typeSel.addEventListener('change', () => {
           if (typeSel.value === 'service' && unit.value === 'Stk') unit.value = 'Std';
           if (typeSel.value === 'product' && unit.value === 'Std') unit.value = 'Stk';
           syncType();
         });
+        const nlS = $('select[name=nlArticleId]', form);
+        if (nlS) nlS.addEventListener('change', () => {
+          const x = nlArticle(nlS.value);
+          if (!x) return;
+          if (!$('[name=name]', form).value) $('[name=name]', form).value = x.name;
+          if (x.unit) unit.value = x.unit;
+          if (!num($('[name=ek]', form).value) && num(x.cost)) $('[name=ek]', form).value = x.cost;
+          margin();
+        });
         const margin = () => {
-          const el = $('#art-margin', form);
-          if (!el) return;
-          const vk = num(($('[name=vk]', form) || {}).value);
+          const vk = num($('[name=vk]', form).value);
           const ek = num($('[name=ek]', form).value);
-          el.value = vk > 0 && ek > 0 ? `${money(vk - ek)} (${(((vk - ek) / vk) * 100).toFixed(1).replace('.', ',')} %)` : '—';
+          $('#art-margin', form).value = vk > 0 && ek > 0 ? `${money(vk - ek)} (${(((vk - ek) / vk) * 100).toFixed(1).replace('.', ',')} %)` : '—';
         };
         form.addEventListener('input', margin);
         syncType();
@@ -1648,225 +1771,13 @@
           ...(a || {}),
           type: fd.type === 'service' ? 'service' : 'product',
           sku, name: fd.name.trim(), category: fd.category.trim(), unit: fd.unit.trim(),
-          ek: num(fd.ek), description: fd.description,
+          ek: num(fd.ek), vk: num(fd.vk), tax: num(fd.tax), description: fd.description, sellable: true,
         };
-        if ('vk' in fd) Object.assign(data, { vk: num(fd.vk), tax: num(fd.tax) });
-        if (inStock) data.sellable = mod('catalog') ? fd.sellable === 'on' : false;
-        else if (isNew) data.sellable = true;
-        if (showStock && data.type === 'product') Object.assign(data, { ean: (fd.ean || '').trim(), min: num(fd.min), location: (fd.location || '').trim() });
+        if ('nlArticleId' in fd) data.nlArticleId = data.type === 'product' ? fd.nlArticleId || '' : '';
         const saved = put('articles', data);
-        if (isNew && tracksStock(saved) && num(fd.initial) > 0) {
-          put('movements', { articleId: saved.id, qty: num(fd.initial), type: 'initial', date: today(), unitCost: saved.ek, note: 'Anfangsbestand' });
-        }
-        toast(isNew ? `${inStock ? 'Lagerartikel' : saved.type === 'service' ? 'Leistung' : 'Produkt'} angelegt` : 'Gespeichert', 'ok');
+        toast(isNew ? `${saved.type === 'service' ? 'Leistung' : 'Produkt'} angelegt` : 'Gespeichert', 'ok');
       },
     });
-  }
-
-  // =============================================================== NEXCOUNT Lager (eigenes System)
-  function viewStockHome() {
-    const st = stockMap();
-    const arts = stockArticles();
-    const low = arts.filter((a) => isLow(a, st));
-    const mv = all('movements').sort(byDateDesc);
-    const since30 = addDays(today(), -30);
-    const value = sum(arts, (a) => Math.max(0, st[a.id] || 0) * num(a.ek));
-    const linked = stockLinked();
-    return `
-      <section class="hero-card stock-hero">
-        <div class="hero-text"><span class="eyebrow">${icon('layers', 14)} NEXCOUNT Lager</span><h2>${low.length ? `${low.length} ${low.length === 1 ? 'Artikel braucht' : 'Artikel brauchen'} Nachschub` : 'Lager im grünen Bereich'}</h2>
-          <p>${arts.length} Lagerartikel · Lagerwert ${money(value)}</p></div>
-        <div class="quick-actions">${quickItems().map((q) => quickBtn(q, 'qa')).join('')}</div>
-      </section>
-      <section class="link-card ${linked ? 'on' : ''}">
-        <span class="module-ic">${icon(linked ? 'link' : 'layers', 18)}</span>
-        <div><b>${linked ? 'Mit der Buchhaltung verknüpft' : 'Eigenständiges Lager'}</b>
-          <span>${linked ? 'Festgeschriebene Rechnungen buchen Ware ab, Eingangsrechnungen buchen zu, verkäufliche Lagerartikel stehen in der Preisliste.' : 'Bestände änderst du nur hier im Lager – Rechnungen und Eingangsrechnungen der Buchhaltung bleiben unberührt.'}</span></div>
-        ${S.user.role === 'admin' ? `<label class="switch-label"><input type="checkbox" class="switch" data-link data-scope="settings" ${linked ? 'checked' : ''} aria-label="Mit Buchhaltung verknüpfen"><span>${linked ? 'Verknüpft' : 'Getrennt'}</span></label>` : ''}
-      </section>
-      <div class="kpis">
-        ${kpi('Lagerwert', money(value), '', 'zu Einkaufspreisen', 'wallet')}
-        ${kpi('Lagerartikel', fmtNum(arts.length), '', `${fmtNum(sum(arts, (a) => Math.max(0, st[a.id] || 0)))} Einheiten`, 'tag')}
-        ${kpi('Unter Mindestbestand', fmtNum(low.length), low.length ? 'neg' : '', 'nachbestellen', 'alert')}
-        ${kpi('Bewegungen', fmtNum(mv.filter((m) => (m.date || '') >= since30).length), '', 'letzte 30 Tage', 'sync')}
-      </div>
-      <div class="grid-2 panels">
-        ${listPanel('Nachbestellen', '<a href="#/stockitems" data-action="set-ui" data-k="artLow" data-v="1">Alle anzeigen</a>',
-          low.slice(0, 8).map((a) => {
-            const s = st[a.id] || 0;
-            const pct = Math.max(4, Math.min(100, (s / num(a.min)) * 100));
-            return `<li class="clickable" data-action="move-in" data-id="${a.id}"><div><b>${esc(a.name)}</b><div class="bar-meter" style="margin-top:6px"><span style="width:${pct}%"></span></div></div><span class="num"><b>${fmtNum(s)}</b> <span class="muted small">/ ${fmtNum(a.min)} ${esc(a.unit || '')}</span></span></li>`;
-          }), 'check', 'Alle Artikel sind ausreichend vorrätig.')}
-        ${listPanel('Letzte Bewegungen', '<a href="#/stock">Alle anzeigen</a>',
-          mv.slice(0, 8).map((m) => { const a = articleRaw(m.articleId) || {}; const q = num(m.qty); return `<li><div><b>${esc(a.name || '(unbekannt)')}</b><span class="sub">${fmtDate(m.date)} · ${esc(MV_TYPES[m.type] || m.type)}${m.note ? ` · ${esc(m.note)}` : ''}</span></div><span class="num ${q >= 0 ? 'pos' : 'neg'}"><b>${q > 0 ? '+' : ''}${fmtNum(q)}</b> <span class="muted small">${esc(a.unit || '')}</span></span></li>`; }),
-          'layers', 'Noch keine Bewegungen.')}
-      </div>`;
-  }
-
-  function viewStockItems() {
-    const st = stockMap();
-    const all_ = stockArticles();
-    const cats = [...new Set(all_.map((a) => a.category).filter(Boolean))].sort();
-    const locs = [...new Set(all_.map((a) => a.location).filter(Boolean))].sort();
-    const q = (UI.q.sart || '').toLowerCase();
-    let list = all_;
-    if (q) list = list.filter((a) => [a.sku, a.name, a.category, a.location, a.ean].join(' ').toLowerCase().includes(q));
-    if (UI.q.sartCat) list = list.filter((a) => a.category === UI.q.sartCat);
-    if (UI.q.sartLoc) list = list.filter((a) => a.location === UI.q.sartLoc);
-    if (UI.q.artLow === '1') list = list.filter((a) => isLow(a, st));
-    const value = sum(list, (a) => Math.max(0, st[a.id] || 0) * num(a.ek));
-    return `
-      <div class="toolbar">
-        ${searchBox('sart', 'Suchen (Nr., Name, EAN, Lagerort) …')}
-        ${cats.length ? uiSelect('sartCat', [['', 'Alle Kategorien'], ...cats.map((c) => [c, c])]) : ''}
-        ${locs.length ? uiSelect('sartLoc', [['', 'Alle Lagerorte'], ...locs.map((c) => [c, c])]) : ''}
-        ${uiSelect('artLow', [['', 'Alle Bestände'], ['1', 'Unter Mindestbestand']])}
-        <div class="actions">
-          <button class="btn" data-action="export" data-what="articles">${icon('download', 16)} Inventurliste</button>
-          <button class="btn primary" data-action="new-stock-item">${icon('plus', 16)} Lagerartikel</button>
-        </div>
-      </div>
-      <section class="card flush">
-        ${list.length ? `<div class="table-wrap"><table>
-          <thead><tr><th>Nr.</th><th>Bezeichnung</th><th>Kategorie</th><th>Lagerort</th><th class="num">Bestand</th><th class="num">Mindest</th><th class="num">Wert/Einheit</th><th class="num">Lagerwert</th><th></th></tr></thead>
-          <tbody>${list.map((a) => {
-            const s = st[a.id] || 0;
-            return `<tr class="clickable" data-action="edit-article" data-id="${a.id}">
-              <td class="muted">${esc(a.sku)}</td>
-              <td><b>${esc(a.name)}</b>${a.sellable !== false && mod('catalog') ? ' <span class="badge info">verkäuflich</span>' : ''}${a.ean ? `<span class="sub">EAN ${esc(a.ean)}</span>` : ''}</td>
-              <td>${esc(a.category || '—')}</td>
-              <td>${esc(a.location || '—')}</td>
-              <td class="num">${isLow(a, st) ? `<span class="badge low">${fmtNum(s)} ${esc(a.unit || '')}</span>` : `<b>${fmtNum(s)}</b> <span class="muted">${esc(a.unit || '')}</span>`}</td>
-              <td class="num muted">${num(a.min) ? fmtNum(a.min) : '—'}</td>
-              <td class="num">${money(a.ek)}</td>
-              <td class="num">${money(Math.max(0, s) * num(a.ek))}</td>
-              <td class="actions"><button class="btn sm" data-action="move-in" data-id="${a.id}" title="Wareneingang">${icon('plus', 14)}</button>
-                <button class="btn sm" data-action="move-out" data-id="${a.id}" title="Warenausgang">${icon('minus', 14)}</button></td></tr>`;
-          }).join('')}</tbody>
-          <tfoot><tr><td colspan="7">${list.length} Lagerartikel</td><td class="num">${money(value)}</td><td></td></tr></tfoot>
-        </table></div>`
-        : empty('layers', all_.length ? 'Nichts gefunden für diesen Filter.' : 'Noch keine Lagerartikel. Lege Artikel mit Anfangsbestand, Mindestmenge und Lagerort an.',
-          all_.length ? '' : `<button class="btn primary" data-action="new-stock-item">${icon('plus', 16)} Ersten Lagerartikel anlegen</button>`)}
-      </section>`;
-  }
-
-  function viewStock() {
-    const arts = stockArticles();
-    let mv = all('movements').sort(byDateDesc);
-    if (UI.q.mvArt) mv = mv.filter((m) => m.articleId === UI.q.mvArt);
-    if (UI.q.mvType) mv = mv.filter((m) => m.type === UI.q.mvType);
-    const q = (UI.q.mv || '').toLowerCase();
-    if (q) mv = mv.filter((m) => { const a = articleRaw(m.articleId) || {}; return [a.name, a.sku, m.note, m.createdBy].join(' ').toLowerCase().includes(q); });
-    const shown = mv.slice(0, 400);
-    return `
-      <div class="toolbar">
-        ${searchBox('mv', 'Bewegungen durchsuchen …')}
-        <select id="s-mvArt" data-ui="mvArt">${articleOptions(UI.q.mvArt, { withStock: false, placeholder: 'Alle Artikel', productsOnly: true })}</select>
-        ${uiSelect('mvType', [['', 'Alle Arten'], ...Object.entries(MV_TYPES)])}
-        <div class="actions">
-          <button class="btn" data-action="inventory">${icon('clipboard', 16)} Inventur</button>
-          <button class="btn" data-action="move-out">${icon('minus', 16)} Ausgang</button>
-          <button class="btn primary" data-action="move-in">${icon('plus', 16)} Eingang</button>
-        </div>
-      </div>
-      <section class="card flush">
-        ${shown.length ? `<div class="table-wrap"><table>
-          <thead><tr><th>Datum</th><th>Artikel</th><th>Art</th><th class="num">Menge</th><th class="num">Wert</th><th>Notiz / Beleg</th><th>Erfasst von</th><th></th></tr></thead>
-          <tbody>${shown.map((m) => {
-            const a = articleRaw(m.articleId) || { name: '(unbekannt)', sku: '' };
-            const q_ = num(m.qty);
-            const manual = ['initial', 'in', 'out', 'correction'].includes(m.type);
-            return `<tr>
-              <td>${fmtDate(m.date)}</td>
-              <td><b>${esc(a.name)}</b><span class="sub">${esc(a.sku)}${a.archived ? ' · archiviert' : ''}</span></td>
-              <td><span class="badge ${m.type === 'storno' ? 'cancelled' : ''}">${esc(MV_TYPES[m.type] || m.type)}</span></td>
-              <td class="num ${q_ >= 0 ? 'pos' : 'neg'}"><b>${q_ > 0 ? '+' : ''}${fmtNum(q_)}</b> ${esc(a.unit || '')}</td>
-              <td class="num">${money(Math.abs(q_) * num(m.unitCost))}</td>
-              <td>${m.docId ? `<a href="#/documents" data-action="open-doc" data-id="${m.docId}">${esc(m.note)}</a>` : esc(m.note || '')}</td>
-              <td class="muted">${esc(m.createdBy || '')}</td>
-              <td class="actions">${manual && !m.reversedBy ? `<button class="btn sm ghost" data-action="storno-move" data-id="${m.id}" title="Bewegung stornieren">${icon('undo', 14)}</button>` : m.reversedBy ? '<span class="muted small">storniert</span>' : ''}</td>
-            </tr>`;
-          }).join('')}</tbody>
-        </table></div>${mv.length > shown.length ? `<p class="muted small" style="padding:12px 16px">Die neuesten ${shown.length} von ${mv.length} Bewegungen. Nutze Filter oder den CSV-Export.</p>` : ''}`
-        : empty('layers', arts.length ? 'Keine Bewegungen für diesen Filter.' : 'Lege zuerst Lagerartikel an.', arts.length ? '' : '<a class="btn primary" href="#/stockitems">Zu den Lagerartikeln</a>')}
-      </section>`;
-  }
-
-  function openMovement(type, articleId) {
-    if (!stockArticles().length) return toast('Bitte zuerst einen Lagerartikel anlegen.', 'error');
-    const isIn = type === 'in';
-    const a0 = articleId ? get('articles', articleId) : null;
-    openModal({
-      title: isIn ? 'Wareneingang buchen' : 'Warenausgang buchen',
-      body: `<div class="grid2">
-          ${field('Artikel', `<select name="articleId" required>${articleOptions(articleId, { productsOnly: true })}</select>`, 'span2')}
-          ${field('Menge', numInp('qty', '', 'required min="0.001"'))}
-          ${field('Datum', inp('date', today(), 'type="date" required'))}
-          ${isIn ? field('Einkaufspreis / Wert je Einheit (€)', numInp('unitCost', a0 ? a0.ek : '', 'min="0"')) : ''}
-          ${field('Notiz', inp('note', '', `maxlength="200" placeholder="${isIn ? 'z. B. Lieferschein-Nr.' : 'z. B. Verbrauch, Ausleihe, Bruch'}"`), isIn ? '' : 'span2')}
-        </div>`,
-      submit: 'Buchen',
-      onMount(form) {
-        const sel = $('[name=articleId]', form);
-        sel.addEventListener('change', () => {
-          const a = get('articles', sel.value);
-          const uc = $('[name=unitCost]', form);
-          if (a && uc) uc.value = a.ek ?? '';
-        });
-      },
-      onSubmit(fd) {
-        const a = get('articles', fd.articleId);
-        if (!a) throw new Error('Bitte Artikel wählen.');
-        const qty = num(fd.qty);
-        if (qty <= 0) throw new Error('Menge muss größer als 0 sein.');
-        const st = stockMap()[a.id] || 0;
-        if (!isIn && qty > st && !confirm(`Der Bestand (${fmtNum(st)}) reicht nicht aus. Trotzdem buchen? Der Bestand wird negativ.`)) return false;
-        put('movements', { articleId: a.id, qty: isIn ? qty : -qty, type, date: fd.date, unitCost: isIn ? num(fd.unitCost) : num(a.ek), note: fd.note.trim() });
-        toast(`${isIn ? 'Eingang' : 'Ausgang'} gebucht: ${fmtNum(qty)} ${a.unit || ''} ${a.name}`, 'ok');
-      },
-    });
-  }
-
-  function openInventory(articleId) {
-    if (!stockArticles().length) return toast('Bitte zuerst einen Lagerartikel anlegen.', 'error');
-    const st = stockMap();
-    openModal({
-      title: 'Inventur / Bestandskorrektur',
-      body: `<p class="muted">Gib den tatsächlich gezählten Bestand ein. NEXCOUNT bucht die Differenz als Inventurkorrektur.</p>
-        <div class="grid2">
-          ${field('Artikel', `<select name="articleId" required>${articleOptions(articleId, { productsOnly: true })}</select>`, 'span2')}
-          ${field('Buchbestand', '<input id="inv-current" readonly>')}
-          ${field('Gezählter Bestand', numInp('counted', '', 'required min="0"'))}
-          ${field('Datum', inp('date', today(), 'type="date" required'))}
-          ${field('Notiz', inp('note', 'Inventur', 'maxlength="200"'))}
-        </div>`,
-      submit: 'Korrektur buchen',
-      onMount(form) {
-        const sel = $('[name=articleId]', form);
-        const upd = () => { const a = get('articles', sel.value); $('#inv-current').value = a ? `${fmtNum(st[a.id] || 0)} ${a.unit || ''}` : ''; };
-        sel.addEventListener('change', upd);
-        upd();
-      },
-      onSubmit(fd) {
-        const a = get('articles', fd.articleId);
-        if (!a) throw new Error('Bitte Artikel wählen.');
-        const diff = r3(num(fd.counted) - (stockMap()[a.id] || 0));
-        if (!diff) { toast('Bestand stimmt – keine Korrektur nötig.'); return; }
-        put('movements', { articleId: a.id, qty: diff, type: 'correction', date: fd.date, unitCost: num(a.ek), note: fd.note.trim() });
-        toast(`Inventurdifferenz ${diff > 0 ? '+' : ''}${fmtNum(diff)} ${a.unit || ''} gebucht`, 'ok');
-      },
-    });
-  }
-
-  function stornoMovement(id) {
-    const m = get('movements', id);
-    if (!m || m.reversedBy) return;
-    const a = articleRaw(m.articleId) || {};
-    if (!confirm(`Bewegung „${MV_TYPES[m.type]} ${fmtNum(m.qty)} ${a.unit || ''} ${a.name || ''}“ stornieren? Es wird eine Gegenbuchung erstellt.`)) return;
-    const rev = put('movements', { articleId: m.articleId, qty: -num(m.qty), type: 'storno', date: today(), unitCost: m.unitCost, note: `Storno: ${MV_TYPES[m.type]}${m.note ? ` (${m.note})` : ''}`, reverses: m.id });
-    put('movements', { ...m, reversedBy: rev.id });
-    toast('Bewegung storniert', 'ok');
-    render();
   }
 
   // =============================================================== Ansicht: Belege (Rechnungen, Angebote, Eingangsrechnungen)
@@ -2075,7 +1986,7 @@
         </div>`;
     const hint = isQuote
       ? 'Mit <b>Fertigstellen</b> erhält das Angebot eine Nummer und kann gedruckt werden. Nimmt der Kunde an, wandelst du es mit einem Klick in eine Rechnung um.'
-      : `Beim <b>${purchase ? 'Erfassen' : 'Festschreiben'}</b> erhält der Beleg eine fortlaufende Nummer${mod('inventory') ? (kind === 'sale' ? ' und Produkte werden aus dem Lager gebucht' : ' und Produkte werden ins Lager eingebucht') : ''}. Danach sind nur noch Zahlung oder Storno möglich.`;
+      : `Beim <b>${purchase ? 'Erfassen' : 'Festschreiben'}</b> erhält der Beleg eine fortlaufende Nummer${nlLinked() && kind !== 'quote' ? (kind === 'sale' ? ' und verbundene Produkte werden in NEXLOGISTIC ausgebucht' : ' und verbundene Produkte werden in NEXLOGISTIC eingebucht') : ''}. Danach sind nur noch Zahlung oder Storno möglich.`;
 
     openModal({
       title: existing ? `${K.label} bearbeiten (Entwurf)` : K.newTitle,
@@ -2083,7 +1994,7 @@
       body: `${header}
         ${!contacts.length && customer ? '<div class="alert info">Noch keine Kunden vorhanden – lege sie zuerst unter <a href="#/contacts">Kontakte</a> an.</div>' : ''}
         <div class="table-wrap"><table class="items-table">
-          <thead><tr>${useCatalog ? `<th>${mod('inventory') ? 'Artikel' : 'Produkt / Leistung'}</th>` : ''}<th>Beschreibung</th><th class="num">Menge</th><th class="num">${purchase ? 'EK' : 'Preis'} netto</th><th>USt</th><th class="num">Summe</th><th></th></tr></thead>
+          <thead><tr>${useCatalog ? `<th>Produkt / Leistung</th>` : ''}<th>Beschreibung</th><th class="num">Menge</th><th class="num">${purchase ? 'EK' : 'Preis'} netto</th><th>USt</th><th class="num">Summe</th><th></th></tr></thead>
           <tbody id="doc-items"></tbody>
         </table></div>
         <div class="toolbar"><button type="button" class="btn sm" id="add-item">${icon('plus', 14)} Position</button><span class="spacer"></span><div id="doc-totals" style="flex:1"></div></div>
@@ -2156,7 +2067,7 @@
             const d = collect(f);
             if (!d.items.length) throw new Error('Bitte mindestens eine Position mit Beschreibung erfassen.');
             const msg = isQuote ? `Angebot über ${money(calcTotals(d.items).gross)} fertigstellen?`
-              : `${K.label} über ${money(calcTotals(d.items).gross)} ${purchase ? 'erfassen' : 'festschreiben'}?${mod('inventory') ? ' Die Lagerbestände werden gebucht.' : ''}`;
+              : `${K.label} über ${money(calcTotals(d.items).gross)} ${purchase ? 'erfassen' : 'festschreiben'}?${nlLinked() && nlLines(d).length ? ' Der Lagerbestand in NEXLOGISTIC wird gebucht.' : ''}`;
             if (!confirm(msg)) return;
             const saved = finalizeDoc(d);
             closeModal();
@@ -2253,6 +2164,9 @@
       doc.paidAt ? ['Bezahlt am', fmtDate(doc.paidAt)] : null,
       doc.status === 'open' && doc.kind !== 'quote' ? ['Offen', `<b>${money(openAmount(doc))}</b>`] : null,
       doc.fromQuoteNumber ? ['Aus Angebot', esc(doc.fromQuoteNumber)] : null,
+      doc.nlBook ? ['Lager (NEXLOGISTIC)', doc.nlCancel ? (doc.nlCancel.state === 'done' ? 'zurückgebucht' : '<span class="badge warn">Storno ausstehend</span>')
+        : doc.nlBook.state === 'done' ? `<span class="badge ok">gebucht</span>${(doc.nlBook.warnings || []).length ? ' <span class="small neg">Bestand unter 0</span>' : ''}`
+          : doc.nlBook.error ? `<span class="badge warn">ausstehend</span> <span class="small muted">${esc(doc.nlBook.error)}</span>` : '<span class="muted">wird gebucht …</span>'] : null,
     ].filter(Boolean);
     const payTable = pays.length ? `<section class="subsection"><h4>Zahlungen</h4><div class="table-wrap"><table>
         <thead><tr><th>Datum</th><th>Zahlungsart</th><th class="num">Betrag</th><th class="num">Skonto / Abzug</th><th></th></tr></thead>
@@ -3267,9 +3181,6 @@
       const es = entries.filter((e) => String(e.date || '').startsWith(k));
       return { label: monthLabel(k).split(' ')[0], a: sum(es.filter((e) => e.kind === 'income'), (e) => e.net), b: sum(es.filter((e) => e.kind === 'expense'), (e) => e.net) };
     });
-    // Lager
-    const st = stockMap();
-    const arts = stockArticles();
     // Verein: Kassabericht nach Bereichen (Sphären)
     const club = isClub();
     const smallBiz = !!settings().smallBusiness;
@@ -3297,10 +3208,6 @@
           <p class="muted small" style="margin-top:10px">Begünstigungsschädlicher Betrieb: ${money(wgb.i)} Einnahmen im Zeitraum. Bleiben die Umsätze daraus im Jahr unter 40.000 €, gilt die Ausnahmegenehmigung nach § 45a BAO automatisch und die Gemeinnützigkeit bleibt erhalten. Entbehrliche Hilfsbetriebe (z. B. kleine Vereinsfeste) und begünstigungsschädliche Betriebe sind körperschaftsteuerpflichtig – Freibetrag 10.000 € (§ 23 KStG, Stand 2025). Keine Steuerberatung.</p>
         </section>
       </div>` : '';
-    const stockCats = {};
-    for (const a of arts) stockCats[a.category || 'Ohne Kategorie'] = (stockCats[a.category || 'Ohne Kategorie'] || 0) + Math.max(0, st[a.id] || 0) * num(a.ek);
-    const stockTotal = sum(Object.values(stockCats), (v) => v);
-    const top = arts.map((a) => ({ a, v: Math.max(0, st[a.id] || 0) * num(a.ek) })).sort((x, y) => y.v - x.v).slice(0, 8);
     // Offene Posten
     const openSale = all('documents').filter((d) => d.kind === 'sale' && d.status === 'open');
     const openPurch = all('documents').filter((d) => d.kind === 'purchase' && d.status === 'open');
@@ -3346,17 +3253,10 @@
           </tbody></table>
         </section>` : ''}
       </div>
-      ${mod('inventory') ? `<div class="grid-2">
-        <section class="card"><div class="card-head"><h3>Lagerwert nach Kategorie</h3><span class="muted">zu Einkaufspreisen</span></div>${catTable(Object.entries(stockCats).sort((a, b) => b[1] - a[1]), stockTotal)}</section>
-        <section class="card"><div class="card-head"><h3>Wertvollste Lagerposten</h3></div>
-          ${top.length ? `<table><tbody>${top.map(({ a, v }) => `<tr><td><b>${esc(a.name)}</b><span class="sub">${esc(a.sku)} · ${fmtNum(st[a.id] || 0)} ${esc(a.unit || '')}</span></td><td class="num">${money(v)}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Keine Artikel.</p>'}
-        </section>
-      </div>` : ''}
       <section class="card"><div class="card-head"><h3>Datenexport</h3><span class="muted">CSV im Excel-Format (Semikolon, UTF-8)</span></div>
         <div class="toolbar">
           <button class="btn" data-action="export" data-what="entries">${icon('download', 16)} Buchungen (Zeitraum)</button>
-          ${mod('catalog') ? `<button class="btn" data-action="export" data-what="articles">${icon('download', 16)} ${mod('inventory') ? 'Artikel & Bestände' : 'Produkte & Leistungen'}</button>` : ''}
-          ${mod('inventory') ? `<button class="btn" data-action="export" data-what="movements">${icon('download', 16)} Lagerbewegungen</button>` : ''}
+          ${mod('catalog') ? `<button class="btn" data-action="export" data-what="articles">${icon('download', 16)} Produkte & Leistungen</button>` : ''}
           ${docKindsOn().length ? `<button class="btn" data-action="export" data-what="documents">${icon('download', 16)} Belege</button>` : ''}
           ${mod('contacts') ? `<button class="btn" data-action="export" data-what="contacts">${icon('download', 16)} Kontakte</button>` : ''}
           ${mod('members') ? `<button class="btn" data-action="export" data-what="members">${icon('download', 16)} Mitglieder</button>` : ''}
@@ -3370,7 +3270,6 @@
 
   function doExport(what) {
     const stamp = today();
-    const st = stockMap();
     if (what === 'entries') {
       const year = UI.q.repYear || today().slice(0, 4);
       const [from, to] = UI.route === 'reports' ? periodRange(year, UI.q.repPeriod || 'year') : ['0000', '9999'];
@@ -3378,9 +3277,12 @@
       downloadCsv(`nexcount-buchungen-${stamp}.csv`, ['Datum', 'Art', 'Kategorie', 'Beschreibung', 'Zahlungsart', 'Beleg', 'Netto', 'USt-Satz', 'USt', 'Brutto', ...(isClub() ? ['Bereich'] : [])],
         rows.map((e) => [fmtDate(e.date), KINDS[e.kind], e.category, e.description, e.method, e.ref, num(e.net), e.rate == null ? 'gemischt' : `${e.rate} %`, num(e.tax), num(e.gross), ...(isClub() ? [SPHERES[e.sphere || 'ideell']] : [])]));
     } else if (what === 'articles') {
-      const list = UI.space === 'stock' ? stockArticles() : articles();
-      downloadCsv(`nexcount-${UI.space === 'stock' ? 'inventurliste' : 'artikel'}-${stamp}.csv`, ['Art.-Nr.', 'Bezeichnung', 'Art', 'Kategorie', 'EAN', 'Einheit', 'Bestand', 'Gezählt', 'Mindestbestand', 'EK netto', 'VK netto', 'USt-Satz', 'Lagerwert', 'Lagerort'],
-        list.map((a) => [a.sku, a.name, a.type === 'service' ? 'Leistung' : 'Produkt', a.category, a.ean, a.unit, tracksStock(a) ? st[a.id] || 0 : '', '', num(a.min), num(a.ek), num(a.vk), `${num(a.tax)} %`, tracksStock(a) ? Math.max(0, st[a.id] || 0) * num(a.ek) : '', a.location]));
+      downloadCsv(`nexcount-artikel-${stamp}.csv`, ['Art.-Nr.', 'Bezeichnung', 'Art', 'Kategorie', 'Einheit', 'EK netto', 'VK netto', 'USt-Satz', ...(nlLinked() ? ['Bestand (NEXLOGISTIC)'] : [])],
+        catalogArticles().map((a) => { const x = nlArticle(a.nlArticleId); return [a.sku, a.name, a.type === 'service' ? 'Leistung' : 'Produkt', a.category, a.unit, num(a.ek), num(a.vk), `${num(a.tax)} %`, ...(nlLinked() ? [x ? num(x.stock) : ''] : [])]; }));
+    } else if (what === 'legacy-stock') {
+      // bisheriges NEXCOUNT-Lager (vor NEXLOGISTIC) – Artikel mit Bestand
+      downloadCsv(`nexcount-altes-lager-${stamp}.csv`, ['Art.-Nr.', 'Bezeichnung', 'Kategorie', 'EAN', 'Einheit', 'Bestand', 'Mindestbestand', 'EK netto', 'Lagerort'],
+        legacyStock().map(({ a, stock }) => [a.sku, a.name, a.category, a.ean, a.unit, stock, num(a.min), num(a.ek), a.location]));
     } else if (what === 'members') {
       downloadCsv(`nexcount-mitglieder-${stamp}.csv`, ['Nr.', 'Name', 'Status', 'Eintritt', 'Austritt', 'Geburtsdatum', 'Beitragsgruppe', 'Beitrag', 'Zahlweise', 'E-Mail', 'Telefon', 'Straße', 'PLZ', 'Ort', 'IBAN', 'Mandatsreferenz', 'Mandat vom'],
         members().map((m) => [m.number, m.name, MEMBER_STATUS[m.status], fmtDate(m.joinedAt), fmtDate(m.leftAt), fmtDate(m.birthday), m.feeGroup, num(m.fee), (INTERVALS[m.feeInterval] || INTERVALS.year)[0], m.email, m.phone, m.street, m.zip, m.city, m.iban, m.mandateRef, fmtDate(m.mandateDate)]));
@@ -3505,7 +3407,7 @@
       </section>
       <section class="card">
         <div class="card-head"><h3>Vorlagen</h3></div>
-        <p class="muted small" style="margin-bottom:12px">Mit einem Klick auf eine passende Kombination umstellen (das Lager bleibt, wie es ist):</p>
+        <p class="muted small" style="margin-bottom:12px">Mit einem Klick auf eine passende Kombination umstellen:</p>
         <div class="preset-list">${Object.entries(PRESETS).map(([k, p]) => `<button type="button" class="preset row" data-action="apply-preset" data-preset="${k}" ${admin ? '' : 'disabled'}>
           <span class="preset-ic">${icon(p.icon, 18)}</span><span><b>${esc(p.label)}</b><small>${esc(p.desc)}</small></span></button>`).join('')}</div>
       </section>
@@ -3797,15 +3699,6 @@
     ent(60, 'expense', 'Veranstaltungen', 'Sommerfest Einkauf Getränke', 540, 'entbehrlich', 'Kassa');
     ent(90, 'income', 'Veranstaltungen', 'Startgelder Vereinsturnier', 380, 'zweck', 'Kassa');
     ent(30, 'income', 'Zinserträge', 'Zinsen Tagesgeld', 12.4, 'vermoegen');
-    if (mod('inventory')) {
-      const item = (sku, name, unit, ek, min, location, initial) => {
-        const a = put('articles', { type: 'product', sku, name, category: 'Vereinsinventar', unit, ek, min, location, sellable: false });
-        put('movements', { articleId: a.id, qty: initial, type: 'initial', date: addDays(today(), -90), unitCost: ek, note: 'Anfangsbestand' });
-      };
-      item('L-0001', 'Trainingsbälle Größe 5', 'Stk', 25, 10, 'Geräteraum', 14);
-      item('L-0002', 'Hütchen-Set (40 Stk)', 'Set', 18, 2, 'Geräteraum', 3);
-      item('L-0003', 'Getränkekisten Wasser', 'Kiste', 6, 8, 'Vereinsheim', 5);
-    }
     toast('Beispieldaten angelegt', 'ok');
     render();
   }
@@ -3820,9 +3713,7 @@
     const k2 = put('contacts', { type: 'customer', number: 'K-0002', name: 'Café Sonnenschein', contactPerson: 'Jonas Weber', email: 'hallo@cafe-sonnenschein.example', street: 'Hauptplatz 1', zip: '8010', city: 'Graz', country: 'Österreich' });
     const l1 = put('contacts', { type: 'supplier', number: 'L-0001', name: 'Rösterei Nordlicht KG', email: 'vertrieb@nordlicht.example', street: 'Hafenstraße 22', zip: '4020', city: 'Linz', country: 'Österreich' });
     const mk = (sku, name, category, unit, ek, vk, tax, min, location, initial) => {
-      const a = put('articles', { type: 'product', sku, name, category, unit, ek, vk, tax, min, location });
-      put('movements', { articleId: a.id, qty: initial, type: 'initial', date: addDays(today(), -60), unitCost: ek, note: 'Anfangsbestand' });
-      return a;
+      return put('articles', { type: 'product', sku, name, category, unit, ek, vk, tax });
     };
     const a1 = mk('A-0001', 'Espressobohnen Classico 1 kg', 'Kaffee', 'Stk', 11.9, 19.9, 10, 20, 'Regal A1', 64);
     const a2 = mk('A-0002', 'Bio-Vollmilch 1 l', 'Milch', 'Stk', 1.45, 2.6, 10, 48, 'Kühlraum', 40);
@@ -3942,8 +3833,8 @@
       if (fd.orgType && fd.orgType !== before.orgType) {
         const T = ORG_TYPES[fd.orgType];
         if (!T.legal.includes(data.legalForm)) data.legalForm = T.legal[0];
-        if (confirm(`Organisationsart „${T.label}“: Sollen auch die dafür vorgeschlagenen Funktionen übernommen werden? (Das Lager bleibt, wie es ist. Daten gehen nicht verloren.)`)) {
-          data.modules = { ...modsFromList(T.modules), inventory: mod('inventory') };
+        if (confirm(`Organisationsart „${T.label}“: Sollen auch die dafür vorgeschlagenen Funktionen übernommen werden? (Daten gehen nicht verloren.)`)) {
+          data.modules = modsFromList(T.modules);
         }
         if (fd.orgType === 'club' && before.nonProfit === undefined) data.nonProfit = true;
       }
@@ -3952,6 +3843,14 @@
         rpc('update_company', { p_name: data.name }).then((me) => { S.company = me.company; render(); }).catch(() => {});
       }
       toast('Gespeichert', 'ok');
+      render();
+    },
+    async 'nl-link'(fd) {
+      const code = String(fd.code || '').trim();
+      if (!code) throw new Error('Bitte den Verknüpfungscode aus NEXLOGISTIC eingeben.');
+      NL.status = await rpc('nl_link_accept', { p_code: code });
+      toast('Mit NEXLOGISTIC verknüpft', 'ok');
+      await nlRefresh(true);
       render();
     },
     async profile(fd) {
@@ -4026,7 +3925,7 @@
       const st = setupState();
       const t = el.dataset.type;
       if (st.orgType !== t) {
-        Object.assign(st, { orgType: t, legalForm: ORG_TYPES[t].legal[0], nonProfit: t === 'club', modules: { ...modsFromList(ORG_TYPES[t].modules), inventory: !!st.modules.inventory } });
+        Object.assign(st, { orgType: t, legalForm: ORG_TYPES[t].legal[0], nonProfit: t === 'club', modules: modsFromList(ORG_TYPES[t].modules) });
       }
       render();
     },
@@ -4036,7 +3935,7 @@
     'setup-finish': () => {
       const st = setupState();
       const s = settings();
-      const keys = ['orgType', 'legalForm', 'smallBusiness', 'nonProfit', 'street', 'zip', 'city', 'taxNumber', 'vatId', 'purposes', 'register', 'fbNumber', 'donationRegNo', 'inventoryLink'];
+      const keys = ['orgType', 'legalForm', 'smallBusiness', 'nonProfit', 'street', 'zip', 'city', 'taxNumber', 'vatId', 'purposes', 'register', 'fbNumber', 'donationRegNo'];
       const data = { ...s, id: 'company', name: s.name || companyName(), modules: st.modules, setupDone: true };
       for (const k of keys) data[k] = typeof st[k] === 'string' ? st[k].trim() : st[k];
       if (st.hourlyRate !== '' && st.hourlyRate != null) data.hourlyRate = num(st.hourlyRate);
@@ -4057,7 +3956,13 @@
       if (location.hash !== `#/${home}`) location.hash = `#/${home}`;
       else render();
     },
-    'new-stock-item': () => openArticle(null, 'product', 'stock'),
+    'nl-link-direct': async () => { try { NL.status = await rpc('nl_link_direct'); toast('Mit NEXLOGISTIC verknüpft', 'ok'); await nlRefresh(true); render(); } catch (err) { toast(err.message, 'error'); } },
+    'nl-unlink': async () => {
+      if (!confirm('Verknüpfung mit NEXLOGISTIC trennen? Belege buchen danach keine Bestände mehr. Bereits gebuchte Bewegungen bleiben erhalten.')) return;
+      try { await rpc('nl_link_remove'); toast('Verknüpfung getrennt'); await nlRefresh(true); render(); } catch (err) { toast(err.message, 'error'); }
+    },
+    'nl-migrate': async () => { try { await nlMigrate(); } catch (err) { toast(err.message, 'error'); } },
+    'nl-import-articles': () => openNlImport(),
     'print-page': () => window.print(),
     // ---------- Verein
     'new-member': () => openMember(),
@@ -4116,8 +4021,7 @@
     'apply-preset': (el) => {
       const p = PRESETS[el.dataset.preset];
       if (!confirm(`Vorlage „${p.label}“ übernehmen? Nicht enthaltene Bereiche werden ausgeblendet – ihre Daten bleiben erhalten.`)) return;
-      const keepStock = el.dataset.preset === 'all' ? true : mod('inventory');
-      put('settings', { ...settings(), id: 'company', setupDone: true, modules: { ...modsFromList(p.modules), inventory: keepStock } });
+      put('settings', { ...settings(), id: 'company', setupDone: true, modules: modsFromList(p.modules) });
       toast(`Vorlage „${p.label}“ aktiv`, 'ok');
       render();
     },
@@ -4130,10 +4034,6 @@
       render();
       toast('Artikel archiviert');
     },
-    'move-in': (el) => openMovement('in', el.dataset.id),
-    'move-out': (el) => openMovement('out', el.dataset.id),
-    inventory: (el) => openInventory(el.dataset.id),
-    'storno-move': (el) => stornoMovement(el.dataset.id),
     'new-contact': () => openContact(),
     'edit-contact': (el) => openContact(el.dataset.id),
     'new-doc': (el) => openDoc(null, el.dataset.kind),
@@ -4191,7 +4091,7 @@
       if (!el) return;
     }
     if (!el || !ACTIONS[el.dataset.action]) return;
-    if (el.closest('#modal-root') && !['archive-article', 'inventory'].includes(el.dataset.action)) return;
+    if (el.closest('#modal-root') && !['archive-article'].includes(el.dataset.action)) return;
     e.preventDefault();
     if (el.closest('#modal-root')) closeModal();
     if (el.closest('#quick-menu')) qm.classList.remove('open');
@@ -4210,14 +4110,6 @@
     if (el.dataset.setupField && UI.setup) {
       UI.setup[el.dataset.setupField] = el.type === 'checkbox' ? el.checked : el.value;
       if (el.type === 'checkbox') { UI.setupTyping = false; render(); }
-      return;
-    }
-    // Lager mit der Buchhaltung verknüpfen / trennen
-    if (el.hasAttribute('data-link')) {
-      if (el.dataset.scope === 'setup') { UI.setup.inventoryLink = el.checked; render(); return; }
-      put('settings', { ...settings(), id: 'company', inventoryLink: el.checked });
-      toast(el.checked ? 'Lager mit der Buchhaltung verknüpft – Belege buchen ab jetzt Bestände.' : 'Lager getrennt – es läuft jetzt eigenständig.', 'ok');
-      render();
       return;
     }
     const key = el.dataset.module;

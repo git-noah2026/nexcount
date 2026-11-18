@@ -1,7 +1,7 @@
 # NEXCOUNT by Andrerer – Das Buchhaltungs- und Lagersystem für die Kleinen
 
 Web-App für Selbstständige, Dienstleister, Kleinunternehmen und Vereine: Rechnungen, Angebote,
-Zeiterfassung, Mitglieder, Beiträge, Spenden, Kassabuch – und als eigenes System **NEXCOUNT Lager**.
+Zeiterfassung, Mitglieder, Beiträge, Spenden, Kassabuch – verknüpfbar mit **NEXLOGISTIC** (Lager & Logistik).
 Ausgelegt auf **Österreich** (UStG 1994, BAO, EStG) – siehe unten.
 Mit Benutzeranmeldung, Teams und Echtzeit-Synchronisierung zwischen allen Geräten.
 
@@ -55,17 +55,25 @@ Name, E-Mail-Adresse (mit Bestätigungslink) und Passwort (mit Prüfung des aktu
 Geräten abmelden, Datenexport, Organisation verlassen, Organisation löschen und **Konto löschen**.
 Die drei letzten Funktionen brauchen die Migration `20261118200000_account.sql` (Workflow „Supabase-Datenbank“).
 
-## NEXCOUNT Lager – eigenes System, optional verknüpft
+## Lager: NEXLOGISTIC verknüpfen
 
-Das Lager hat einen eigenen Bereich (Umschalter „Buchhaltung | Lager“, eigene Farbe):
-Lager-Übersicht, Lagerartikel mit Lagerort und Mindestbestand, Bewegungen, Inventur, Inventurliste.
+Das Lager ist seit November 2026 eine eigene App der NEX-Familie: **NEXLOGISTIC** (Bestände, Wareneingang,
+Inventur, Versand). NEXCOUNT hat keinen eigenen Lager-Bereich mehr, kann NEXLOGISTIC aber verknüpfen
+(*Einstellungen → Funktionen → NEXLOGISTIC*):
 
-- **Verknüpft:** Festgeschriebene Rechnungen buchen Ware ab, Einkäufe buchen zu, verkäufliche
-  Lagerartikel stehen in der Preisliste.
-- **Eigenständig:** Bestände ändern sich nur im Lager – z. B. Vereinsinventar, Material, Ausleihe.
+- **Verknüpfen:** mit einem Klick, wenn man in beiden Apps Admin ist – sonst mit einem Verknüpfungscode
+  (`NC-…`, 24 h gültig), den ein NEXLOGISTIC-Admin unter *Einstellungen → Verknüpfung mit NEXCOUNT* erzeugt.
+- **Preisliste:** Produkte lassen sich mit einem Lagerartikel verbinden und zeigen dann den Bestand;
+  „Aus Lager“ übernimmt Lagerartikel als Produkte.
+- **Belege:** Festgeschriebene Rechnungen buchen Warenausgänge, erfasste Eingangsrechnungen Wareneingänge
+  (inkl. Einkaufspreis, gleitender Durchschnitt), Stornos buchen zurück. Ohne Internet wird nachgeholt;
+  doppelte Buchungen sind ausgeschlossen (Bewegungs-IDs aus Beleg + Position).
+- **Altes NEXCOUNT-Lager:** bleibt gespeichert und lässt sich nach dem Verknüpfen mit einem Klick
+  (Artikel + aktueller Bestand) nach NEXLOGISTIC übernehmen oder als CSV exportieren.
 
-Belege, die ohne Verknüpfung festgeschrieben wurden, buchen nachträglich keinen Bestand –
-nach dem Verknüpfen einmal eine Inventur machen.
+Die Datenbankfunktionen dafür (`nl_link_*`) liegen im NEXLOGISTIC-Repo, weil sie dessen Tabellen beschreiben.
+
+## Technik
 
 | Teil              | Dienst                                                                  |
 |-------------------|-------------------------------------------------------------------------|
@@ -131,8 +139,6 @@ Redirect URLs* eintragen. Supabase-Bibliothek aktualisieren: `npm update @supaba
   löst bei Konflikten nach „neueste Änderung gewinnt“ auf.
 - Jede neue Revision erhöht `companies.seq`; **Realtime** meldet das allen Geräten der Firma,
   die sich dann die Änderungen holen.
-- Bestände werden aus unveränderlichen Lagerbewegungen berechnet → keine Konflikte bei
-  gleichzeitiger Arbeit an mehreren Geräten.
 
 ## Sicherheit
 
